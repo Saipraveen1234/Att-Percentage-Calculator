@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   // 'admin' or 'teacher'
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  classes      Class[]
+  attendanceMarked Attendance[]
+
+  @@map("users")
+}
+
+model Class {
+  id           Int      @id @default(autoincrement())
+  name         String
+  subject      String?
+  academicYear String?  @map("academic_year")
+  teacherId    Int      @map("teacher_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  teacher      User     @relation(fields: [teacherId], references: [id])
+  students     Student[]
+  attendance   Attendance[]
+
+  @@map("classes")
+}
+
+model Student {
+  id              Int      @id @default(autoincrement())
+  registrationNo  String?  @map("registration_no")
+  rollNumber      String   @unique @map("roll_number")
+  admissionNo     String?  @map("admission_no")
+  name            String
+  email           String?
+  gender          String?  // M, F
+  secondLanguage  String?  @map("second_language") // T (Telugu), S (Sanskrit), H (Hindi)
+  classId         Int      @map("class_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  attendance  Attendance[]
+
+  @@map("students")
+}
+
+
+model Attendance {
+  id         Int      @id @default(autoincrement())
+  studentId  Int      @map("student_id")
+  classId    Int      @map("class_id")
+  date       DateTime @db.Date
+  status     String   // 'present', 'absent', 'late', 'excused'
+  markedBy   Int      @map("marked_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class      Class    @relation(fields: [classId], references: [id])
+  markedByUser User   @relation(fields: [markedBy], references: [id])
+
+  @@unique([studentId, classId, date])
+  @@map("attendance")
+}
