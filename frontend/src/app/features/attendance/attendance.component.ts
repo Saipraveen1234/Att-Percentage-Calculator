@@ -1,288 +1,266 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ClassService, Class } from '../../core/services/class.service';
-import { StudentService, Student } from '../../core/services/student.service';
-import { AttendanceService, AttendanceRecord } from '../../core/services/attendance.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
-interface DateColumn {
-  date: string;
-  dayOfWeek: string;
-  dayOfMonth: string;
+interface Student {
+  id: number;
+  rollNumber: string;
+  name: string;
+  email?: string;
+}
+
+interface Class {
+  id: number;
+  name: string;
+  subject?: string;
+}
+
+interface AttendanceRecord {
+  studentId: number;
+  status: 'present' | 'absent' | 'late';
 }
 
 @Component({
   selector: 'app-attendance',
+  standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">Daily Attendance</h1>
-          <p class="text-gray-600 mt-1">BSM / BSM-2 / Semester 3 / B</p>
-        </div>
-        <div class="flex gap-3">
-          <input
-            type="date"
-            [(ngModel)]="selectedDate"
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <select [(ngModel)]="selectedClassId" (change)="loadStudents()" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
-            <option [value]="null">Select a class</option>
-            @for (class of classes(); track class.id) {
-              <option [value]="class.id">{{ class.name }}</option>
-            }
-          </select>
+    <div class="p-6">
+      <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Mark Attendance</h1>
+        <p class="text-gray-600 mt-2">Record student attendance for the day</p>
+      </div>
+
+      <!-- Date and Class Selection -->
+      <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+            <input
+              type="date"
+              [(ngModel)]="selectedDate"
+              (change)="loadStudents()"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Class</label>
+            <select
+              [(ngModel)]="selectedClassId"
+              (change)="loadStudents()"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Select a class</option>
+              @for (class of classes; track class.id) {
+                <option [value]="class.id">{{ class.name }}</option>
+              }
+            </select>
+          </div>
         </div>
       </div>
 
-      <!-- Attendance Table -->
-      @if (selectedClassId) {
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-          @if (loading()) {
-            <div class="flex justify-center py-12">
-              <div class="spinner"></div>
-            </div>
-          } @else if (students().length === 0) {
-            <div class="text-center py-12 text-gray-500">
-              <p class="text-lg">No students in this class</p>
-            </div>
-          } @else {
-            <!-- Table Header -->
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
-                      Student Name
-                    </th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Action
-                    </th>
-                    @for (dateCol of dateColumns(); track dateCol.date) {
-                      <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[60px]">
-                        <div>{{ dateCol.dayOfWeek }}</div>
-                        <div class="text-lg font-bold text-gray-900">{{ dateCol.dayOfMonth }}</div>
-                      </th>
-                    }
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  @for (student of students(); track student.id; let idx = $index) {
-                    <tr class="hover:bg-gray-50 transition-colors">
-                      <td class="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10">
-                        <div>
-                          <div class="text-sm font-medium text-gray-900">{{ student.name }}</div>
-                          <div class="text-xs text-gray-500">{{ student.rollNumber }}</div>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-center">
-                        @if (getAttendanceStatus(student.id) === 'present') {
-                          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-status-present/10 text-status-present">
-                            Present
-                          </span>
-                        } @else if (getAttendanceStatus(student.id) === 'absent') {
-                          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-status-absent/10 text-status-absent">
-                            Absent
-                          </span>
-                        } @else if (getAttendanceStatus(student.id) === 'late') {
-                          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-status-late/10 text-status-late">
-                            Late
-                          </span>
-                        }
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-center">
-                        <div class="flex gap-1 justify-center">
-                          <button
-                            (click)="setAttendance(student.id, 'present')"
-                            [class.bg-status-present]="getAttendanceStatus(student.id) === 'present'"
-                            [class.text-white]="getAttendanceStatus(student.id) === 'present'"
-                            [class.bg-gray-100]="getAttendanceStatus(student.id) !== 'present'"
-                            [class.text-gray-700]="getAttendanceStatus(student.id) !== 'present'"
-                            class="px-3 py-1 rounded text-xs font-medium hover:opacity-80 transition-opacity"
-                            title="Mark Present"
-                          >
-                            P
-                          </button>
-                          <button
-                            (click)="setAttendance(student.id, 'absent')"
-                            [class.bg-status-absent]="getAttendanceStatus(student.id) === 'absent'"
-                            [class.text-white]="getAttendanceStatus(student.id) === 'absent'"
-                            [class.bg-gray-100]="getAttendanceStatus(student.id) !== 'absent'"
-                            [class.text-gray-700]="getAttendanceStatus(student.id) !== 'absent'"
-                            class="px-3 py-1 rounded text-xs font-medium hover:opacity-80 transition-opacity"
-                            title="Mark Absent"
-                          >
-                            A
-                          </button>
-                          <button
-                            (click)="setAttendance(student.id, 'late')"
-                            [class.bg-status-late]="getAttendanceStatus(student.id) === 'late'"
-                            [class.text-white]="getAttendanceStatus(student.id) === 'late'"
-                            [class.bg-gray-100]="getAttendanceStatus(student.id) !== 'late'"
-                            [class.text-gray-700]="getAttendanceStatus(student.id) !== 'late'"
-                            class="px-3 py-1 rounded text-xs font-medium hover:opacity-80 transition-opacity"
-                            title="Mark Late"
-                          >
-                            L
-                          </button>
-                        </div>
-                      </td>
-                      @for (dateCol of dateColumns(); track dateCol.date) {
-                        <td class="px-4 py-4 text-center">
-                          <span class="text-sm text-gray-400">-</span>
-                        </td>
-                      }
-                      <td class="px-6 py-4 text-center">
-                        <span class="text-sm font-medium text-gray-900">{{ idx + 1 }}</span>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-              <div class="flex gap-2">
-                <button (click)="markAll('present')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                  Mark All Present
-                </button>
-                <button (click)="markAll('absent')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                  Mark All Absent
-                </button>
-              </div>
-              <button
-                (click)="submitAttendance()"
-                [disabled]="saving()"
-                class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                @if (saving()) {
-                  <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                }
-                Save Attendance
-              </button>
-            </div>
-          }
+      @if (loading()) {
+        <div class="text-center py-12">
+          <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p class="mt-4 text-gray-600">Loading students...</p>
         </div>
-      }
+      } @else if (students().length > 0) {
+        <!-- Bulk Actions -->
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div class="flex gap-3">
+            <button
+              (click)="markAllPresent()"
+              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            >
+              Mark All Present
+            </button>
+            <button
+              (click)="markAllAbsent()"
+              class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              Mark All Absent
+            </button>
+          </div>
+        </div>
 
-      @if (successMessage()) {
-        <div class="fixed bottom-4 right-4 bg-status-present text-white px-6 py-3 rounded-lg shadow-lg">
-          {{ successMessage() }}
+        <!-- Students List -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">Students ({{ students().length }})</h2>
+          
+          <div class="space-y-3">
+            @for (student of students(); track student.id; let idx = $index) {
+              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                <div class="flex-1">
+                  <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
+                  <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
+                </div>
+                
+                <div class="flex gap-2">
+                  <button
+                    (click)="setAttendance(student.id, 'present')"
+                    [class.bg-green-600]="getStatus(student.id) === 'present'"
+                    [class.text-white]="getStatus(student.id) === 'present'"
+                    [class.bg-gray-100]="getStatus(student.id) !== 'present'"
+                    [class.text-gray-700]="getStatus(student.id) !== 'present'"
+                    class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
+                  >
+                    ✓ Present
+                  </button>
+                  <button
+                    (click)="setAttendance(student.id, 'absent')"
+                    [class.bg-red-600]="getStatus(student.id) === 'absent'"
+                    [class.text-white]="getStatus(student.id) === 'absent'"
+                    [class.bg-gray-100]="getStatus(student.id) !== 'absent'"
+                    [class.text-gray-700]="getStatus(student.id) !== 'absent'"
+                    class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
+                  >
+                    ✕ Absent
+                  </button>
+                  <button
+                    (click)="setAttendance(student.id, 'late')"
+                    [class.bg-yellow-600]="getStatus(student.id) === 'late'"
+                    [class.text-white]="getStatus(student.id) === 'late'"
+                    [class.bg-gray-100]="getStatus(student.id) !== 'late'"
+                    [class.text-gray-700]="getStatus(student.id) !== 'late'"
+                    class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
+                  >
+                    ⏰ Late
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Save Button -->
+          <div class="mt-6 flex justify-end">
+            <button
+              (click)="saveAttendance()"
+              [disabled]="saving()"
+              class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              @if (saving()) {
+                <span class="flex items-center gap-2">
+                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Saving...
+                </span>
+              } @else {
+                Save Attendance
+              }
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="bg-white rounded-lg shadow-sm p-12 text-center">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <h3 class="mt-4 text-lg font-medium text-gray-900">No students found</h3>
+          <p class="mt-2 text-gray-500">Select a class and date to view students</p>
         </div>
       }
     </div>
-  `,
-  styles: [`
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .animate-spin {
-      animation: spin 1s linear infinite;
-    }
-  `]
+  `
 })
 export class AttendanceComponent implements OnInit {
-  private classService = inject(ClassService);
-  private studentService = inject(StudentService);
-  private attendanceService = inject(AttendanceService);
-
-  classes = signal<Class[]>([]);
   students = signal<Student[]>([]);
-  dateColumns = signal<DateColumn[]>([]);
+  classes: Class[] = [];
+  selectedDate: string = new Date().toISOString().split('T')[0];
+  selectedClassId: string = '';
+  attendanceMap = new Map<number, 'present' | 'absent' | 'late'>();
   loading = signal(false);
   saving = signal(false);
-  successMessage = signal('');
 
-  selectedDate = new Date().toISOString().split('T')[0];
-  selectedClassId: number | null = null;
-  attendanceMap = new Map<number, 'present' | 'absent' | 'late' | 'excused'>();
+  constructor(private http: HttpClient) { }
 
-  ngOnInit(): void {
+  ngOnInit() {
     this.loadClasses();
-    this.generateDateColumns();
   }
 
-  generateDateColumns(): void {
-    const dates: DateColumn[] = [];
-    const today = new Date();
+  loadClasses() {
+    this.http.get<Class[]>(`${environment.apiUrl}/classes`).subscribe({
+      next: (classes) => {
+        this.classes = classes;
+        if (classes.length > 0 && !this.selectedClassId) {
+          this.selectedClassId = classes[0].id.toString();
+          this.loadStudents();
+        }
+      },
+      error: (error) => {
+        console.error('Failed to load classes:', error);
+        alert('Failed to load classes');
+      }
+    });
+  }
 
-    // Generate last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-
-      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-      dates.push({
-        date: date.toISOString().split('T')[0],
-        dayOfWeek: dayNames[date.getDay()],
-        dayOfMonth: date.getDate().toString()
-      });
+  loadStudents() {
+    if (!this.selectedClassId) {
+      this.students.set([]);
+      return;
     }
 
-    this.dateColumns.set(dates);
-  }
-
-  loadClasses(): void {
-    this.classService.getAll().subscribe({
-      next: (classes) => this.classes.set(classes)
-    });
-  }
-
-  loadStudents(): void {
-    if (!this.selectedClassId) return;
-
     this.loading.set(true);
-    this.studentService.getAll({ classId: this.selectedClassId }).subscribe({
-      next: (response) => {
-        this.students.set(response.students);
-        this.attendanceMap.clear();
-        response.students.forEach(s => this.attendanceMap.set(s.id, 'present'));
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false)
-    });
+    this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}`)
+      .subscribe({
+        next: (response) => {
+          this.students.set(response.students);
+          this.attendanceMap.clear();
+          this.loading.set(false);
+        },
+        error: (error) => {
+          console.error('Failed to load students:', error);
+          alert('Failed to load students');
+          this.loading.set(false);
+        }
+      });
   }
 
-  setAttendance(studentId: number, status: 'present' | 'absent' | 'late' | 'excused'): void {
+  setAttendance(studentId: number, status: 'present' | 'absent' | 'late') {
     this.attendanceMap.set(studentId, status);
   }
 
-  getAttendanceStatus(studentId: number): string {
-    return this.attendanceMap.get(studentId) || 'present';
+  getStatus(studentId: number): 'present' | 'absent' | 'late' | undefined {
+    return this.attendanceMap.get(studentId);
   }
 
-  markAll(status: 'present' | 'absent'): void {
-    this.students().forEach(s => this.attendanceMap.set(s.id, status));
+  markAllPresent() {
+    this.students().forEach(student => {
+      this.attendanceMap.set(student.id, 'present');
+    });
   }
 
-  submitAttendance(): void {
-    if (!this.selectedClassId) return;
+  markAllAbsent() {
+    this.students().forEach(student => {
+      this.attendanceMap.set(student.id, 'absent');
+    });
+  }
 
-    const records: AttendanceRecord[] = Array.from(this.attendanceMap.entries()).map(([studentId, status]) => ({
-      studentId,
-      status
-    }));
+  saveAttendance() {
+    if (this.attendanceMap.size === 0) {
+      alert('Please mark attendance for at least one student');
+      return;
+    }
+
+    const records: AttendanceRecord[] = Array.from(this.attendanceMap.entries()).map(
+      ([studentId, status]) => ({ studentId, status })
+    );
 
     this.saving.set(true);
-    this.attendanceService.markAttendance(this.selectedClassId, this.selectedDate, records).subscribe({
+    this.http.post(`${environment.apiUrl}/attendance`, {
+      date: this.selectedDate,
+      classId: Number(this.selectedClassId),
+      records
+    }).subscribe({
       next: () => {
+        alert('Attendance saved successfully!');
+        this.attendanceMap.clear();
         this.saving.set(false);
-        this.successMessage.set('Attendance saved successfully!');
-        setTimeout(() => this.successMessage.set(''), 3000);
       },
-      error: () => {
-        this.saving.set(false);
+      error: (error) => {
+        console.error('Failed to save attendance:', error);
         alert('Failed to save attendance');
+        this.saving.set(false);
       }
     });
   }

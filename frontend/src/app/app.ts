@@ -10,19 +10,19 @@ import { AuthService } from './core/services/auth.service';
     @if (authService.isAuthenticated()) {
       <div class="min-h-screen bg-gray-50">
         <!-- Sidebar -->
-        <div class="fixed inset-y-0 left-0 w-64 bg-sidebar-bg shadow-2xl">
+        <div class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
           <div class="flex flex-col h-full">
             <!-- Logo -->
-            <div class="flex items-center justify-center h-16 px-6 border-b border-white/10">
-              <h1 class="text-xl font-bold text-sidebar-text">ACAMIS</h1>
+            <div class="flex items-center justify-center h-16 bg-blue-600">
+              <h1 class="text-xl font-bold text-white">Attendance Tracker</h1>
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 px-4 py-6 space-y-1">
+            <nav class="flex-1 px-4 py-6 space-y-2">
               <a
                 routerLink="/dashboard"
-                routerLinkActive="bg-primary/10 text-primary border-l-4 border-primary"
-                class="flex items-center px-4 py-3 text-sidebar-muted rounded-r-lg hover:bg-white/5 transition-all border-l-4 border-transparent"
+                routerLinkActive="bg-blue-50 text-blue-600"
+                class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <span class="text-lg mr-3">📊</span>
                 <span class="font-medium">Dashboard</span>
@@ -66,12 +66,12 @@ import { AuthService } from './core/services/auth.service';
             </nav>
 
             <!-- User section -->
-            <div class="p-4 border-t border-white/10">
+            <div class="p-4 border-t border-gray-200">
               @if (currentUser$ | async; as user) {
                 <div class="flex items-center justify-between">
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-sidebar-text truncate">{{ user.username }}</p>
-                    <p class="text-xs text-sidebar-muted truncate">{{ user.email }}</p>
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ user.username }}</p>
+                    <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
                   </div>
                   <button
                     (click)="logout()"
