@@ -56,6 +56,15 @@ import { AuthService } from './core/services/auth.service';
               </a>
 
               <a
+                routerLink="/exam-marks"
+                routerLinkActive="bg-blue-50 text-blue-600"
+                class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <span class="text-lg mr-3">📝</span>
+                <span class="font-medium">Exam Marks</span>
+              </a>
+
+              <a
                 routerLink="/reports"
                 routerLinkActive="bg-blue-50 text-blue-600"
                 class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"

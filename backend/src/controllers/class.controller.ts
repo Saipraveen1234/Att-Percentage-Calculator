@@ -3,7 +3,11 @@ import prisma from '../utils/prisma';
 
 export const getAllClasses = async (req: any, res: Response) => {
     try {
+        // Filter classes by authenticated teacher
         const classes = await prisma.class.findMany({
+            where: {
+                teacherId: req.user.id
+            },
             include: {
                 teacher: {
                     select: {
@@ -28,7 +32,7 @@ export const getAllClasses = async (req: any, res: Response) => {
     }
 };
 
-export const getClassById = async (req: Request, res: Response) => {
+export const getClassById = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -50,6 +54,11 @@ export const getClassById = async (req: Request, res: Response) => {
 
         if (!classData) {
             return res.status(404).json({ error: 'Class not found' });
+        }
+
+        // Verify ownership
+        if (classData.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'You can only view your own classes' });
         }
 
         res.json(classData);
@@ -92,10 +101,23 @@ export const createClass = async (req: any, res: Response) => {
     }
 };
 
-export const updateClass = async (req: Request, res: Response) => {
+export const updateClass = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
         const { name, subject, academicYear } = req.body;
+
+        // Check if class exists and verify ownership
+        const existingClass = await prisma.class.findUnique({
+            where: { id: Number(id) }
+        });
+
+        if (!existingClass) {
+            return res.status(404).json({ error: 'Class not found' });
+        }
+
+        if (existingClass.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'You can only update your own classes' });
+        }
 
         const classData = await prisma.class.update({
             where: { id: Number(id) },
@@ -122,9 +144,22 @@ export const updateClass = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteClass = async (req: Request, res: Response) => {
+export const deleteClass = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
+
+        // Check if class exists and verify ownership
+        const existingClass = await prisma.class.findUnique({
+            where: { id: Number(id) }
+        });
+
+        if (!existingClass) {
+            return res.status(404).json({ error: 'Class not found' });
+        }
+
+        if (existingClass.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'You can only delete your own classes' });
+        }
 
         await prisma.class.delete({
             where: { id: Number(id) }

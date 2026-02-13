@@ -82,7 +82,13 @@ export class AuthService {
     private loadCurrentUser(): void {
         this.http.get<User>(`${environment.apiUrl}/auth/me`).subscribe({
             next: (user) => this.currentUserSubject.next(user),
-            error: () => this.logout()
+            error: (err) => {
+                // Only logout if the token is invalid or expired (401/403)
+                if (err.status === 401 || err.status === 403) {
+                    this.logout();
+                }
+                console.error('Failed to load user:', err);
+            }
         });
     }
 }

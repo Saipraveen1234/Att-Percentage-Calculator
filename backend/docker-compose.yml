@@ -16,7 +16,8 @@ services:
       # Frontend URL for CORS (adjustable)
       - FRONTEND_URL=http://localhost:4200
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: always
     command: sh -c "npx prisma migrate deploy && npm start"
 
@@ -24,7 +25,7 @@ services:
   db:
     image: postgres:14-alpine
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -32,6 +33,11 @@ services:
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:

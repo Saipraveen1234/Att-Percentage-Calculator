@@ -20,6 +20,7 @@ model User {
   
   classes      Class[]
   attendanceMarked Attendance[]
+  examMarksEntered ExamMark[]
 
   @@map("users")
 }
@@ -35,6 +36,7 @@ model Class {
   teacher      User     @relation(fields: [teacherId], references: [id])
   students     Student[]
   attendance   Attendance[]
+  examMarks    ExamMark[]
 
   @@map("classes")
 }
@@ -54,6 +56,7 @@ model Student {
   
   class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   attendance  Attendance[]
+  examMarks   ExamMark[]
 
   @@map("students")
 }
@@ -74,4 +77,24 @@ model Attendance {
 
   @@unique([studentId, classId, date])
   @@map("attendance")
+}
+
+model ExamMark {
+  id           Int      @id @default(autoincrement())
+  studentId    Int      @map("student_id")
+  classId      Int      @map("class_id")
+  semester     String   // 'semester1', 'semester2'
+  examType     String   @map("exam_type") // 'mid1', 'mid2'
+  marks        Float    // Marks obtained (max 28)
+  academicYear String   @map("academic_year") // e.g., '2025-2026'
+  markedBy     Int      @map("marked_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class        Class    @relation(fields: [classId], references: [id])
+  markedByUser User     @relation(fields: [markedBy], references: [id])
+
+  @@unique([studentId, classId, semester, examType, academicYear])
+  @@map("exam_marks")
 }

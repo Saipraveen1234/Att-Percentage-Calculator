@@ -14,7 +14,11 @@ export const getAllStudents = async (req: any, res: Response) => {
         const { classId, search, page = 1, limit = 50 } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
 
-        const where: any = {};
+        const where: any = {
+            class: {
+                teacherId: req.user.id
+            }
+        };
 
         if (classId) {
             where.classId = Number(classId);
@@ -61,7 +65,7 @@ export const getAllStudents = async (req: any, res: Response) => {
     }
 };
 
-export const getStudentById = async (req: Request, res: Response) => {
+export const getStudentById = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -80,6 +84,11 @@ export const getStudentById = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Student not found' });
         }
 
+        // Verify ownership
+        if (student.class.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
         res.json(student);
     } catch (error) {
         console.error('Get student error:', error);
@@ -87,12 +96,21 @@ export const getStudentById = async (req: Request, res: Response) => {
     }
 };
 
-export const createStudent = async (req: Request, res: Response) => {
+export const createStudent = async (req: any, res: Response) => {
     try {
         const { rollNumber, name, email, classId } = req.body;
 
         if (!rollNumber || !name || !classId) {
             return res.status(400).json({ error: 'Roll number, name, and class are required' });
+        }
+
+        // Verify class ownership
+        const classData = await prisma.class.findUnique({
+            where: { id: Number(classId) }
+        });
+
+        if (!classData || classData.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'You can only add students to your own classes' });
         }
 
         // Check for duplicate roll number
@@ -123,10 +141,32 @@ export const createStudent = async (req: Request, res: Response) => {
     }
 };
 
-export const updateStudent = async (req: Request, res: Response) => {
+export const updateStudent = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
         const { rollNumber, name, email, classId } = req.body;
+
+        // Verify ownership
+        const existingStudent = await prisma.student.findUnique({
+            where: { id: Number(id) },
+            include: { class: true }
+        });
+
+        if (!existingStudent) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+
+        if (existingStudent.class.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // If moving to another class, verify target class ownership
+        if (classId) {
+            const newClass = await prisma.class.findUnique({ where: { id: Number(classId) } });
+            if (!newClass || newClass.teacherId !== req.user.id) {
+                return res.status(403).json({ error: 'Cannot move student to another teacher\'s class' });
+            }
+        }
 
         const student = await prisma.student.update({
             where: { id: Number(id) },
@@ -148,9 +188,23 @@ export const updateStudent = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteStudent = async (req: Request, res: Response) => {
+export const deleteStudent = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
+
+        // Verify ownership
+        const student = await prisma.student.findUnique({
+            where: { id: Number(id) },
+            include: { class: true }
+        });
+
+        if (!student) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+
+        if (student.class.teacherId !== req.user.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
 
         await prisma.student.delete({
             where: { id: Number(id) }
@@ -173,6 +227,14 @@ export const importStudents = async (req: any, res: Response) => {
         const { classId } = req.body;
         if (!classId) {
             return res.status(400).json({ error: 'Class ID is required' });
+        }
+
+        // Verify class ownership
+        const classData = await prisma.class.findUnique({ where: { id: Number(classId) } });
+        if (!classData || classData.teacherId !== req.user.id) {
+            // Clean up uploaded file
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(403).json({ error: 'You can only import students to your own classes' });
         }
 
         const filePath = req.file.path;
