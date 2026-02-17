@@ -1,4 +1,4 @@
 export const environment = {
     production: true,
-    apiUrl: 'https://your-backend-url.railway.app/api'  // Update this after deploying backend
+    apiUrl: 'https://att-percentage-calculator-production.up.railway.app/api'
 };
