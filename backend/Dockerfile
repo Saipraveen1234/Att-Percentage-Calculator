@@ -25,5 +25,5 @@ RUN npm run build
 # Expose the API port
 EXPOSE 3001
 
-# Start the server (using the built JS)
-CMD ["npm", "start"]
+# Run database migrations and start the server
+CMD npx prisma migrate deploy && npm start
