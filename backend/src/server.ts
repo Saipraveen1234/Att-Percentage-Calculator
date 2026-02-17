@@ -17,7 +17,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
     origin: [
         'http://localhost:4200',
-        'https://att-percentage-calculator.vercel.app'
+        'https://att-percentage-calculator.vercel.app',
+        'https://att-percentage-calculator-mfkiqba3.vercel.app'  // Your actual Vercel URL
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
