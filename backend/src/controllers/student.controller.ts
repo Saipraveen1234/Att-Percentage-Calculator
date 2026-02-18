@@ -11,8 +11,11 @@ const upload = multer({ dest: 'uploads/' });
 
 export const getAllStudents = async (req: any, res: Response) => {
     try {
-        const { classId, search, page = 1, limit = 50 } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        // When fetching for a specific class (e.g. attendance page), return all students.
+        // Only apply pagination when browsing all students without a classId filter.
+        const { classId, search, page = 1, limit } = req.query;
+        const effectiveLimit = limit ? Number(limit) : (classId ? 10000 : 50);
+        const skip = (Number(page) - 1) * effectiveLimit;
 
         const where: any = {
             class: {
@@ -44,7 +47,7 @@ export const getAllStudents = async (req: any, res: Response) => {
                     }
                 },
                 skip,
-                take: Number(limit),
+                take: effectiveLimit,
                 orderBy: { rollNumber: 'asc' }
             }),
             prisma.student.count({ where })
