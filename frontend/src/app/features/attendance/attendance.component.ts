@@ -67,6 +67,64 @@ interface AttendanceRecord {
           <p class="mt-4 text-gray-600">Loading students...</p>
         </div>
       } @else if (students().length > 0) {
+
+        <!-- Quick Entry Panel -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
+          <div class="flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <h2 class="text-base font-semibold text-blue-800">Quick Entry — Mark Present by Roll Number</h2>
+          </div>
+          <p class="text-sm text-blue-600 mb-3">
+            Type roll numbers of <strong>present</strong> students. Separate by comma, space, or new line. All others will be marked <strong>Absent</strong>.
+          </p>
+          <textarea
+            [(ngModel)]="quickEntryText"
+            placeholder="e.g. 21A91A0501, 21A91A0502&#10;21A91A0503"
+            rows="3"
+            class="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
+          ></textarea>
+
+          <div class="flex items-center gap-3 mt-3">
+            <button
+              (click)="applyQuickEntry()"
+              class="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              Apply
+            </button>
+            <button
+              (click)="clearQuickEntry()"
+              class="px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition text-sm"
+            >
+              Clear
+            </button>
+          </div>
+
+          <!-- Feedback after applying -->
+          @if (quickEntryApplied()) {
+            <div class="mt-3 space-y-2">
+              <div class="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span><strong>{{ matchedCount() }}</strong> student(s) marked Present, <strong>{{ students().length - matchedCount() }}</strong> marked Absent</span>
+              </div>
+              @if (unmatchedRolls().length > 0) {
+                <div class="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                  <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  </svg>
+                  <span><strong>{{ unmatchedRolls().length }}</strong> roll number(s) not found in this class: <span class="font-mono">{{ unmatchedRolls().join(', ') }}</span></span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
         <!-- Bulk Actions -->
         <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
           <div class="flex gap-3">
@@ -91,7 +149,13 @@ interface AttendanceRecord {
           
           <div class="space-y-3">
             @for (student of students(); track student.id; let idx = $index) {
-              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                   [class.border-green-300]="getStatus(student.id) === 'present'"
+                   [class.bg-green-50]="getStatus(student.id) === 'present'"
+                   [class.border-red-300]="getStatus(student.id) === 'absent'"
+                   [class.bg-red-50]="getStatus(student.id) === 'absent'"
+                   [class.border-yellow-300]="getStatus(student.id) === 'late'"
+                   [class.bg-yellow-50]="getStatus(student.id) === 'late'">
                 <div class="flex-1">
                   <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
                   <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
@@ -172,6 +236,12 @@ export class AttendanceComponent implements OnInit {
   loading = signal(false);
   saving = signal(false);
 
+  // Quick Entry state
+  quickEntryText: string = '';
+  quickEntryApplied = signal(false);
+  matchedCount = signal(0);
+  unmatchedRolls = signal<string[]>([]);
+
   constructor(private http: HttpClient) { }
 
   ngOnInit() {
@@ -201,6 +271,8 @@ export class AttendanceComponent implements OnInit {
     }
 
     this.loading.set(true);
+    this.quickEntryApplied.set(false);
+    this.quickEntryText = '';
     this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}`)
       .subscribe({
         next: (response) => {
@@ -216,6 +288,56 @@ export class AttendanceComponent implements OnInit {
       });
   }
 
+  applyQuickEntry() {
+    if (!this.quickEntryText.trim()) return;
+
+    // Parse roll numbers: split by comma, whitespace, or newline
+    const enteredRolls = this.quickEntryText
+      .split(/[\n,\s]+/)
+      .map(r => r.trim().toUpperCase())
+      .filter(r => r.length > 0);
+
+    if (enteredRolls.length === 0) return;
+
+    // Build a set of student roll numbers for fast lookup
+    const studentRollMap = new Map<string, number>();
+    this.students().forEach(s => {
+      studentRollMap.set(s.rollNumber.toUpperCase(), s.id);
+    });
+
+    // Mark matched students present, all others absent
+    let matched = 0;
+    const unmatched: string[] = [];
+
+    this.students().forEach(student => {
+      if (enteredRolls.includes(student.rollNumber.toUpperCase())) {
+        this.attendanceMap.set(student.id, 'present');
+        matched++;
+      } else {
+        this.attendanceMap.set(student.id, 'absent');
+      }
+    });
+
+    // Find roll numbers that didn't match any student
+    enteredRolls.forEach(roll => {
+      if (!studentRollMap.has(roll)) {
+        unmatched.push(roll);
+      }
+    });
+
+    this.matchedCount.set(matched);
+    this.unmatchedRolls.set(unmatched);
+    this.quickEntryApplied.set(true);
+  }
+
+  clearQuickEntry() {
+    this.quickEntryText = '';
+    this.quickEntryApplied.set(false);
+    this.matchedCount.set(0);
+    this.unmatchedRolls.set([]);
+    this.attendanceMap.clear();
+  }
+
   setAttendance(studentId: number, status: 'present' | 'absent' | 'late') {
     this.attendanceMap.set(studentId, status);
   }
@@ -228,12 +350,14 @@ export class AttendanceComponent implements OnInit {
     this.students().forEach(student => {
       this.attendanceMap.set(student.id, 'present');
     });
+    this.quickEntryApplied.set(false);
   }
 
   markAllAbsent() {
     this.students().forEach(student => {
       this.attendanceMap.set(student.id, 'absent');
     });
+    this.quickEntryApplied.set(false);
   }
 
   saveAttendance() {
@@ -255,6 +379,8 @@ export class AttendanceComponent implements OnInit {
       next: () => {
         alert('Attendance saved successfully!');
         this.attendanceMap.clear();
+        this.quickEntryApplied.set(false);
+        this.quickEntryText = '';
         this.saving.set(false);
       },
       error: (error) => {
