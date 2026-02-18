@@ -32,8 +32,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-// Handle preflight requests
-app.options('*', cors());
+// Handle preflight requests (Express 5 compatible)
+app.options('/(.*)', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
