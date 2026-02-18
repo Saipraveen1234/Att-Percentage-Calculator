@@ -9,6 +9,7 @@ interface Student {
   rollNumber: string;
   name: string;
   email?: string;
+  group?: string;
 }
 
 interface Class {
@@ -20,6 +21,11 @@ interface Class {
 interface AttendanceRecord {
   studentId: number;
   status: 'present' | 'absent' | 'late';
+}
+
+interface StudentGroup {
+  name: string;  // group name, e.g. "Biotechnology" or "" for ungrouped
+  students: Student[];
 }
 
 @Component({
@@ -104,7 +110,6 @@ interface AttendanceRecord {
             </button>
           </div>
 
-          <!-- Feedback after applying -->
           @if (quickEntryApplied()) {
             <div class="mt-3 space-y-2">
               <div class="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
@@ -118,7 +123,7 @@ interface AttendanceRecord {
                   <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                   </svg>
-                  <span><strong>{{ unmatchedRolls().length }}</strong> roll number(s) not found in this class: <span class="font-mono">{{ unmatchedRolls().join(', ') }}</span></span>
+                  <span><strong>{{ unmatchedRolls().length }}</strong> roll number(s) not found: <span class="font-mono">{{ unmatchedRolls().join(', ') }}</span></span>
                 </div>
               }
             </div>
@@ -143,59 +148,82 @@ interface AttendanceRecord {
           </div>
         </div>
 
-        <!-- Students List -->
+        <!-- Students List — grouped by branch -->
         <div class="bg-white rounded-lg shadow-sm p-6">
-          <h2 class="text-xl font-semibold text-gray-800 mb-4">Students ({{ students().length }})</h2>
-          
-          <div class="space-y-3">
-            @for (student of students(); track student.id; let idx = $index) {
-              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-                   [class.border-green-300]="getStatus(student.id) === 'present'"
-                   [class.bg-green-50]="getStatus(student.id) === 'present'"
-                   [class.border-red-300]="getStatus(student.id) === 'absent'"
-                   [class.bg-red-50]="getStatus(student.id) === 'absent'"
-                   [class.border-yellow-300]="getStatus(student.id) === 'late'"
-                   [class.bg-yellow-50]="getStatus(student.id) === 'late'">
-                <div class="flex-1">
-                  <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
-                  <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
-                </div>
-                
-                <div class="flex gap-2">
-                  <button
-                    (click)="setAttendance(student.id, 'present')"
-                    [class.bg-green-600]="getStatus(student.id) === 'present'"
-                    [class.text-white]="getStatus(student.id) === 'present'"
-                    [class.bg-gray-100]="getStatus(student.id) !== 'present'"
-                    [class.text-gray-700]="getStatus(student.id) !== 'present'"
-                    class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
-                  >
-                    ✓ Present
-                  </button>
-                  <button
-                    (click)="setAttendance(student.id, 'absent')"
-                    [class.bg-red-600]="getStatus(student.id) === 'absent'"
-                    [class.text-white]="getStatus(student.id) === 'absent'"
-                    [class.bg-gray-100]="getStatus(student.id) !== 'absent'"
-                    [class.text-gray-700]="getStatus(student.id) !== 'absent'"
-                    class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
-                  >
-                    ✕ Absent
-                  </button>
-                  <button
-                    (click)="setAttendance(student.id, 'late')"
-                    [class.bg-yellow-600]="getStatus(student.id) === 'late'"
-                    [class.text-white]="getStatus(student.id) === 'late'"
-                    [class.bg-gray-100]="getStatus(student.id) !== 'late'"
-                    [class.text-gray-700]="getStatus(student.id) !== 'late'"
-                    class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
-                  >
-                    ⏰ Late
-                  </button>
-                </div>
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">
+            Students ({{ students().length }})
+            @if (isCombinedClass()) {
+              <span class="ml-2 text-sm font-normal text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                Combined Class · {{ studentGroups().length }} groups
+              </span>
+            }
+          </h2>
+
+          @for (group of studentGroups(); track group.name) {
+            <!-- Group Section Header (only shown for combined classes) -->
+            @if (isCombinedClass()) {
+              <div class="flex items-center gap-3 my-4">
+                <div class="flex-1 h-px bg-gray-200"></div>
+                <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-semibold flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                  {{ group.name }} ({{ group.students.length }})
+                </span>
+                <div class="flex-1 h-px bg-gray-200"></div>
               </div>
             }
-          </div>
+
+            <div class="space-y-3 mb-2">
+              @for (student of group.students; track student.id) {
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                     [class.border-green-300]="getStatus(student.id) === 'present'"
+                     [class.bg-green-50]="getStatus(student.id) === 'present'"
+                     [class.border-red-300]="getStatus(student.id) === 'absent'"
+                     [class.bg-red-50]="getStatus(student.id) === 'absent'"
+                     [class.border-yellow-300]="getStatus(student.id) === 'late'"
+                     [class.bg-yellow-50]="getStatus(student.id) === 'late'">
+                  <div class="flex-1">
+                    <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
+                    <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
+                  </div>
+
+                  <div class="flex gap-2">
+                    <button
+                      (click)="setAttendance(student.id, 'present')"
+                      [class.bg-green-600]="getStatus(student.id) === 'present'"
+                      [class.text-white]="getStatus(student.id) === 'present'"
+                      [class.bg-gray-100]="getStatus(student.id) !== 'present'"
+                      [class.text-gray-700]="getStatus(student.id) !== 'present'"
+                      class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
+                    >
+                      ✓ Present
+                    </button>
+                    <button
+                      (click)="setAttendance(student.id, 'absent')"
+                      [class.bg-red-600]="getStatus(student.id) === 'absent'"
+                      [class.text-white]="getStatus(student.id) === 'absent'"
+                      [class.bg-gray-100]="getStatus(student.id) !== 'absent'"
+                      [class.text-gray-700]="getStatus(student.id) !== 'absent'"
+                      class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
+                    >
+                      ✕ Absent
+                    </button>
+                    <button
+                      (click)="setAttendance(student.id, 'late')"
+                      [class.bg-yellow-600]="getStatus(student.id) === 'late'"
+                      [class.text-white]="getStatus(student.id) === 'late'"
+                      [class.bg-gray-100]="getStatus(student.id) !== 'late'"
+                      [class.text-gray-700]="getStatus(student.id) !== 'late'"
+                      class="px-4 py-2 rounded-lg font-medium transition hover:opacity-80"
+                    >
+                      ⏰ Late
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
 
           <!-- Save Button -->
           <div class="mt-6 flex justify-end">
@@ -241,6 +269,34 @@ export class AttendanceComponent implements OnInit {
   quickEntryApplied = signal(false);
   matchedCount = signal(0);
   unmatchedRolls = signal<string[]>([]);
+
+  // Computed: whether this is a combined class (has students with group set)
+  isCombinedClass = computed(() =>
+    this.students().some(s => s.group && s.group.trim() !== '')
+  );
+
+  // Computed: students grouped by their group field, sorted alphabetically by group name
+  studentGroups = computed<StudentGroup[]>(() => {
+    const groupMap = new Map<string, Student[]>();
+
+    this.students().forEach(student => {
+      const key = student.group?.trim() || '';
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key)!.push(student);
+    });
+
+    // Sort groups alphabetically; ungrouped ('') goes last
+    const sorted = Array.from(groupMap.entries()).sort(([a], [b]) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b);
+    });
+
+    return sorted.map(([name, students]) => ({
+      name: name || 'General',
+      students
+    }));
+  });
 
   constructor(private http: HttpClient) { }
 
@@ -291,7 +347,6 @@ export class AttendanceComponent implements OnInit {
   applyQuickEntry() {
     if (!this.quickEntryText.trim()) return;
 
-    // Parse roll numbers: split by comma, whitespace, or newline
     const enteredRolls = this.quickEntryText
       .split(/[\n,\s]+/)
       .map(r => r.trim().toUpperCase())
@@ -299,13 +354,11 @@ export class AttendanceComponent implements OnInit {
 
     if (enteredRolls.length === 0) return;
 
-    // Build a set of student roll numbers for fast lookup
     const studentRollMap = new Map<string, number>();
     this.students().forEach(s => {
       studentRollMap.set(s.rollNumber.toUpperCase(), s.id);
     });
 
-    // Mark matched students present, all others absent
     let matched = 0;
     const unmatched: string[] = [];
 
@@ -318,11 +371,8 @@ export class AttendanceComponent implements OnInit {
       }
     });
 
-    // Find roll numbers that didn't match any student
     enteredRolls.forEach(roll => {
-      if (!studentRollMap.has(roll)) {
-        unmatched.push(roll);
-      }
+      if (!studentRollMap.has(roll)) unmatched.push(roll);
     });
 
     this.matchedCount.set(matched);

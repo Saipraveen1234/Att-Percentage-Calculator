@@ -8,6 +8,7 @@ export interface Student {
     rollNumber: string;
     name: string;
     email?: string;
+    group?: string;
     classId: number;
     class?: any;
     createdAt: string;
@@ -51,10 +52,11 @@ export class StudentService {
         return this.http.delete<{ message: string }>(`${this.apiUrl}/${id}`);
     }
 
-    importFromFile(file: File, classId: number): Observable<any> {
+    importFromFile(file: File, classId: number, group?: string): Observable<any> {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('classId', classId.toString());
+        if (group) formData.append('group', group);
         return this.http.post(`${this.apiUrl}/import`, formData);
     }
 }

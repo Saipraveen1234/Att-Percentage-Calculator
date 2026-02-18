@@ -98,7 +98,7 @@ export const getStudentById = async (req: any, res: Response) => {
 
 export const createStudent = async (req: any, res: Response) => {
     try {
-        const { rollNumber, name, email, classId } = req.body;
+        const { rollNumber, name, email, classId, group } = req.body;
 
         if (!rollNumber || !name || !classId) {
             return res.status(400).json({ error: 'Roll number, name, and class are required' });
@@ -127,6 +127,7 @@ export const createStudent = async (req: any, res: Response) => {
                 rollNumber,
                 name,
                 email,
+                group: group || null,
                 classId: Number(classId)
             },
             include: {
@@ -224,7 +225,7 @@ export const importStudents = async (req: any, res: Response) => {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const { classId } = req.body;
+        const { classId, group } = req.body;
         if (!classId) {
             return res.status(400).json({ error: 'Class ID is required' });
         }
@@ -369,6 +370,7 @@ export const importStudents = async (req: any, res: Response) => {
                         email: student.email || null,
                         gender: student.gender,
                         secondLanguage: student.secondLanguage,
+                        group: group || null,
                         classId: Number(classId)
                     }
                 });

@@ -5,9 +5,9 @@ import { StudentService, Student } from '../../core/services/student.service';
 import { ClassService, Class } from '../../core/services/class.service';
 
 @Component({
-    selector: 'app-students',
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-students',
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="space-y-6">
       <div class="flex justify-between items-center">
         <div>
@@ -15,7 +15,7 @@ import { ClassService, Class } from '../../core/services/class.service';
           <p class="text-gray-600 mt-1">Manage your student records</p>
         </div>
         <div class="flex gap-2">
-          <button (click)="showImportModal = true" class="btn btn-secondary">
+          <button (click)="openImportModal()" class="btn btn-secondary">
             📁 Import CSV/Excel
           </button>
           <button (click)="showAddModal = true" class="btn btn-primary">
@@ -54,6 +54,7 @@ import { ClassService, Class } from '../../core/services/class.service';
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group/Branch</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -64,6 +65,13 @@ import { ClassService, Class } from '../../core/services/class.service';
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ student.rollNumber }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ student.name }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.email || '-' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      @if (student.group) {
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">{{ student.group }}</span>
+                      } @else {
+                        <span class="text-gray-400">-</span>
+                      }
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.class?.name || '-' }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                       <button (click)="deleteStudent(student.id)" class="text-red-600 hover:text-red-800">Delete</button>
@@ -92,6 +100,38 @@ import { ClassService, Class } from '../../core/services/class.service';
                   }
                 </select>
               </div>
+
+              <!-- Combined Class Toggle -->
+              <div class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="combinedClassCheck"
+                  [(ngModel)]="isCombinedClass"
+                  class="w-4 h-4 text-blue-600 rounded"
+                />
+                <label for="combinedClassCheck" class="text-sm font-medium text-blue-800 cursor-pointer">
+                  Combined Class (multiple groups/branches)
+                </label>
+              </div>
+
+              <!-- Group Name Input (shown only when combined class is checked) -->
+              @if (isCombinedClass) {
+                <div class="border-l-4 border-blue-400 pl-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Group / Branch Name
+                    <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    [(ngModel)]="importGroupName"
+                    placeholder="e.g. Biotechnology, Microbiology, Politics..."
+                    class="input"
+                  />
+                  <p class="text-xs text-gray-500 mt-1">
+                    All students from this file will be tagged with this group name.
+                    Import again with a different group name for the next batch.
+                  </p>
+                </div>
+              }
 
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Upload File</label>
@@ -127,7 +167,7 @@ import { ClassService, Class } from '../../core/services/class.service';
               <button (click)="showImportModal = false" class="btn btn-secondary">Cancel</button>
               <button
                 (click)="importStudents()"
-                [disabled]="!selectedFile || !importClassId || importing()"
+                [disabled]="!selectedFile || !importClassId || (isCombinedClass && !importGroupName.trim()) || importing()"
                 class="btn btn-primary"
               >
                 @if (importing()) {
@@ -163,6 +203,12 @@ import { ClassService, Class } from '../../core/services/class.service';
               </div>
 
               <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Group / Branch (Optional)</label>
+                <input [(ngModel)]="newStudent.group" name="group" placeholder="e.g. Biotechnology" class="input" />
+                <p class="text-xs text-gray-500 mt-1">Leave blank for single-group classes</p>
+              </div>
+
+              <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Class</label>
                 <select [(ngModel)]="newStudent.classId" name="classId" required class="input">
                   <option [value]="null">Select a class</option>
@@ -184,101 +230,115 @@ import { ClassService, Class } from '../../core/services/class.service';
   `
 })
 export class StudentsComponent implements OnInit {
-    private studentService = inject(StudentService);
-    private classService = inject(ClassService);
+  private studentService = inject(StudentService);
+  private classService = inject(ClassService);
 
-    students = signal<Student[]>([]);
-    classes = signal<Class[]>([]);
-    loading = signal(true);
-    selectedClassId: number | null = null;
+  students = signal<Student[]>([]);
+  classes = signal<Class[]>([]);
+  loading = signal(true);
+  selectedClassId: number | null = null;
 
-    showImportModal = false;
-    showAddModal = false;
-    selectedFile: File | null = null;
-    importClassId: number | null = null;
-    importing = signal(false);
-    importResult = signal<any>(null);
+  showImportModal = false;
+  showAddModal = false;
+  selectedFile: File | null = null;
+  importClassId: number | null = null;
+  isCombinedClass = false;
+  importGroupName = '';
+  importing = signal(false);
+  importResult = signal<any>(null);
 
-    newStudent = {
-        rollNumber: '',
-        name: '',
-        email: '',
-        classId: null as number | null
+  newStudent = {
+    rollNumber: '',
+    name: '',
+    email: '',
+    group: '',
+    classId: null as number | null
+  };
+
+  ngOnInit(): void {
+    this.loadClasses();
+    this.loadStudents();
+  }
+
+  loadClasses(): void {
+    this.classService.getAll().subscribe({
+      next: (classes) => this.classes.set(classes)
+    });
+  }
+
+  loadStudents(): void {
+    this.loading.set(true);
+    const params: any = {};
+    if (this.selectedClassId) params.classId = this.selectedClassId;
+
+    this.studentService.getAll(params).subscribe({
+      next: (response) => {
+        this.students.set(response.students);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
+    });
+  }
+
+  openImportModal(): void {
+    this.showImportModal = true;
+    this.isCombinedClass = false;
+    this.importGroupName = '';
+    this.importResult.set(null);
+    this.selectedFile = null;
+  }
+
+  onFileSelected(event: any): void {
+    this.selectedFile = event.target.files[0];
+    this.importResult.set(null);
+  }
+
+  importStudents(): void {
+    if (!this.selectedFile || !this.importClassId) return;
+    if (this.isCombinedClass && !this.importGroupName.trim()) return;
+
+    this.importing.set(true);
+    const group = this.isCombinedClass ? this.importGroupName.trim() : undefined;
+    this.studentService.importFromFile(this.selectedFile, this.importClassId, group).subscribe({
+      next: (result) => {
+        this.importResult.set(result);
+        this.importing.set(false);
+        if (result.success > 0) {
+          this.loadStudents();
+        }
+      },
+      error: () => {
+        this.importing.set(false);
+        this.importResult.set({ success: 0, failed: 1, errors: [{ error: 'Import failed' }] });
+      }
+    });
+  }
+
+  addStudent(): void {
+    if (!this.newStudent.rollNumber || !this.newStudent.name || !this.newStudent.classId) return;
+
+    const studentData = {
+      rollNumber: this.newStudent.rollNumber,
+      name: this.newStudent.name,
+      email: this.newStudent.email || undefined,
+      group: this.newStudent.group || undefined,
+      classId: this.newStudent.classId as number
     };
 
-    ngOnInit(): void {
-        this.loadClasses();
+    this.studentService.create(studentData).subscribe({
+      next: () => {
+        this.showAddModal = false;
+        this.newStudent = { rollNumber: '', name: '', email: '', group: '', classId: null };
         this.loadStudents();
+      }
+    });
+  }
+
+  deleteStudent(id: number): void {
+    if (confirm('Are you sure you want to delete this student?')) {
+      this.studentService.delete(id).subscribe({
+        next: () => this.loadStudents()
+      });
     }
-
-    loadClasses(): void {
-        this.classService.getAll().subscribe({
-            next: (classes) => this.classes.set(classes)
-        });
-    }
-
-    loadStudents(): void {
-        this.loading.set(true);
-        const params: any = {};
-        if (this.selectedClassId) params.classId = this.selectedClassId;
-
-        this.studentService.getAll(params).subscribe({
-            next: (response) => {
-                this.students.set(response.students);
-                this.loading.set(false);
-            },
-            error: () => this.loading.set(false)
-        });
-    }
-
-    onFileSelected(event: any): void {
-        this.selectedFile = event.target.files[0];
-        this.importResult.set(null);
-    }
-
-    importStudents(): void {
-        if (!this.selectedFile || !this.importClassId) return;
-
-        this.importing.set(true);
-        this.studentService.importFromFile(this.selectedFile, this.importClassId).subscribe({
-            next: (result) => {
-                this.importResult.set(result);
-                this.importing.set(false);
-                if (result.success > 0) {
-                    this.loadStudents();
-                }
-            },
-            error: () => {
-                this.importing.set(false);
-                this.importResult.set({ success: 0, failed: 1, errors: [{ error: 'Import failed' }] });
-            }
-        });
-    }
-
-    addStudent(): void {
-        if (!this.newStudent.rollNumber || !this.newStudent.name || !this.newStudent.classId) return;
-
-        const studentData = {
-            rollNumber: this.newStudent.rollNumber,
-            name: this.newStudent.name,
-            email: this.newStudent.email || undefined,
-            classId: this.newStudent.classId as number
-        };
-
-        this.studentService.create(studentData).subscribe({
-            next: () => {
-                this.showAddModal = false;
-                this.newStudent = { rollNumber: '', name: '', email: '', classId: null };
-                this.loadStudents();
-            }
-        });
-    }
-
-    deleteStudent(id: number): void {
-        if (confirm('Are you sure you want to delete this student?')) {
-            this.studentService.delete(id).subscribe({
-                next: () => this.loadStudents()
-            });
-        }
-    }
+  }
 }
