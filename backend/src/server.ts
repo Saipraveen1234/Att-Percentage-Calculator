@@ -15,15 +15,25 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-    origin: [
-        'http://localhost:4200',
-        'https://att-percentage-calculator.vercel.app',
-        'https://att-percentage-calculator-mfkiqba3.vercel.app'  // Your actual Vercel URL
-    ],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        // Allow localhost and any vercel.app subdomain
+        if (
+            origin.startsWith('http://localhost') ||
+            origin.endsWith('.vercel.app') ||
+            origin === 'https://att-percentage-calculator.vercel.app'
+        ) {
+            return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+// Handle preflight requests
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
