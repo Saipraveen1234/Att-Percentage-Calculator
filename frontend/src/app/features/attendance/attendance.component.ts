@@ -24,7 +24,7 @@ interface AttendanceRecord {
 }
 
 interface StudentGroup {
-  name: string;  // group name, e.g. "Biotechnology" or "" for ungrouped
+  name: string;
   students: Student[];
 }
 
@@ -80,22 +80,96 @@ interface StudentGroup {
             <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
-            <h2 class="text-base font-semibold text-blue-800">Quick Entry — Mark Present by Roll Number</h2>
+            <h2 class="text-base font-semibold text-blue-800">Quick Entry</h2>
           </div>
-          <p class="text-sm text-blue-600 mb-3">
-            Type roll numbers of <strong>present</strong> students. Separate by comma, space, or new line. All others will be marked <strong>Absent</strong>.
-          </p>
-          <textarea
-            [(ngModel)]="quickEntryText"
-            placeholder="e.g. 21A91A0501, 21A91A0502&#10;21A91A0503"
-            rows="3"
-            class="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
-          ></textarea>
+
+          <!-- Entry Mode Toggle -->
+          <div class="flex gap-2 mb-4">
+            <button
+              (click)="quickEntryMode = 'rollnumber'"
+              [class.bg-blue-600]="quickEntryMode === 'rollnumber'"
+              [class.text-white]="quickEntryMode === 'rollnumber'"
+              [class.bg-white]="quickEntryMode !== 'rollnumber'"
+              [class.text-blue-700]="quickEntryMode !== 'rollnumber'"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-300 transition"
+            >
+              By Roll Number
+            </button>
+            <button
+              (click)="quickEntryMode = 'serial'"
+              [class.bg-blue-600]="quickEntryMode === 'serial'"
+              [class.text-white]="quickEntryMode === 'serial'"
+              [class.bg-white]="quickEntryMode !== 'serial'"
+              [class.text-blue-700]="quickEntryMode !== 'serial'"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-300 transition"
+            >
+              By Serial No. (Group)
+            </button>
+          </div>
+
+          <!-- Roll Number Mode -->
+          @if (quickEntryMode === 'rollnumber') {
+            <p class="text-sm text-blue-600 mb-3">
+              Type roll numbers of <strong>present</strong> students separated by comma, space, or new line.
+              All others will be marked <strong>Absent</strong>.
+            </p>
+            <textarea
+              [(ngModel)]="quickEntryText"
+              placeholder="e.g. 21A91A0501, 21A91A0502&#10;21A91A0503"
+              rows="3"
+              class="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
+            ></textarea>
+          }
+
+          <!-- Serial Number (Group) Mode -->
+          @if (quickEntryMode === 'serial') {
+            <div class="space-y-3">
+              <!-- Group selector -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Select Group</label>
+                <select
+                  [(ngModel)]="quickEntryGroup"
+                  class="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="">-- Choose a group --</option>
+                  @for (g of studentGroups(); track g.name) {
+                    <option [value]="g.name">{{ g.name }} ({{ g.students.length }} students)</option>
+                  }
+                </select>
+              </div>
+
+              @if (quickEntryGroup) {
+                <!-- Preview of students in selected group -->
+                <div class="bg-white border border-blue-200 rounded-lg px-4 py-2 text-xs text-gray-600 max-h-28 overflow-y-auto">
+                  @for (s of getGroupStudents(quickEntryGroup); track s.id; let i = $index) {
+                    <span class="inline-block mr-3"><span class="font-semibold text-blue-700">{{ i + 1 }}.</span> {{ s.name }}</span>
+                  }
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Enter serial numbers of <strong class="text-green-700">present</strong> students
+                    <span class="text-gray-400 font-normal">(1, 2, 3 … or ranges like 1-5)</span>
+                  </label>
+                  <textarea
+                    [(ngModel)]="quickEntryText"
+                    placeholder="e.g.  1, 2, 3, 5   or   1-10, 15, 20"
+                    rows="2"
+                    class="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
+                  ></textarea>
+                  <p class="text-xs text-gray-500 mt-1">
+                    Only students in <strong>{{ quickEntryGroup }}</strong> are affected. Other groups stay unchanged.
+                  </p>
+                </div>
+              }
+            </div>
+          }
 
           <div class="flex items-center gap-3 mt-3">
             <button
               (click)="applyQuickEntry()"
-              class="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2"
+              [disabled]="quickEntryMode === 'serial' && !quickEntryGroup"
+              class="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -110,20 +184,21 @@ interface StudentGroup {
             </button>
           </div>
 
+          <!-- Feedback after applying -->
           @if (quickEntryApplied()) {
             <div class="mt-3 space-y-2">
               <div class="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                 </svg>
-                <span><strong>{{ matchedCount() }}</strong> student(s) marked Present, <strong>{{ students().length - matchedCount() }}</strong> marked Absent</span>
+                <span>{{ quickEntryFeedback() }}</span>
               </div>
               @if (unmatchedRolls().length > 0) {
                 <div class="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
                   <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                   </svg>
-                  <span><strong>{{ unmatchedRolls().length }}</strong> roll number(s) not found: <span class="font-mono">{{ unmatchedRolls().join(', ') }}</span></span>
+                  <span>Not found: <span class="font-mono">{{ unmatchedRolls().join(', ') }}</span></span>
                 </div>
               }
             </div>
@@ -175,7 +250,7 @@ interface StudentGroup {
             }
 
             <div class="space-y-3 mb-2">
-              @for (student of group.students; track student.id) {
+              @for (student of group.students; track student.id; let i = $index) {
                 <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                      [class.border-green-300]="getStatus(student.id) === 'present'"
                      [class.bg-green-50]="getStatus(student.id) === 'present'"
@@ -183,9 +258,15 @@ interface StudentGroup {
                      [class.bg-red-50]="getStatus(student.id) === 'absent'"
                      [class.border-yellow-300]="getStatus(student.id) === 'late'"
                      [class.bg-yellow-50]="getStatus(student.id) === 'late'">
-                  <div class="flex-1">
-                    <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
-                    <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
+                  <div class="flex items-center gap-3 flex-1">
+                    <!-- Serial number badge -->
+                    <span class="w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                      {{ i + 1 }}
+                    </span>
+                    <div>
+                      <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
+                      <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
+                    </div>
                   </div>
 
                   <div class="flex gap-2">
@@ -265,27 +346,28 @@ export class AttendanceComponent implements OnInit {
   saving = signal(false);
 
   // Quick Entry state
+  quickEntryMode: 'rollnumber' | 'serial' = 'rollnumber';
   quickEntryText: string = '';
+  quickEntryGroup: string = '';
   quickEntryApplied = signal(false);
   matchedCount = signal(0);
   unmatchedRolls = signal<string[]>([]);
+  quickEntryFeedback = signal('');
 
-  // Computed: whether this is a combined class (has students with group set)
+  // Computed: whether this is a combined class
   isCombinedClass = computed(() =>
     this.students().some(s => s.group && s.group.trim() !== '')
   );
 
-  // Computed: students grouped by their group field, sorted alphabetically by group name
+  // Computed: students grouped by their group field
   studentGroups = computed<StudentGroup[]>(() => {
     const groupMap = new Map<string, Student[]>();
-
     this.students().forEach(student => {
       const key = student.group?.trim() || '';
       if (!groupMap.has(key)) groupMap.set(key, []);
       groupMap.get(key)!.push(student);
     });
 
-    // Sort groups alphabetically; ungrouped ('') goes last
     const sorted = Array.from(groupMap.entries()).sort(([a], [b]) => {
       if (a === '') return 1;
       if (b === '') return -1;
@@ -313,8 +395,8 @@ export class AttendanceComponent implements OnInit {
           this.loadStudents();
         }
       },
-      error: (error) => {
-        console.error('Failed to load classes:', error);
+      error: (err) => {
+        console.error('Failed to load classes:', err);
         alert('Failed to load classes');
       }
     });
@@ -325,10 +407,10 @@ export class AttendanceComponent implements OnInit {
       this.students.set([]);
       return;
     }
-
     this.loading.set(true);
     this.quickEntryApplied.set(false);
     this.quickEntryText = '';
+    this.quickEntryGroup = '';
     this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}`)
       .subscribe({
         next: (response) => {
@@ -336,17 +418,86 @@ export class AttendanceComponent implements OnInit {
           this.attendanceMap.clear();
           this.loading.set(false);
         },
-        error: (error) => {
-          console.error('Failed to load students:', error);
+        error: (err) => {
+          console.error('Failed to load students:', err);
           alert('Failed to load students');
           this.loading.set(false);
         }
       });
   }
 
+  /** Returns the ordered list of students for a given group name */
+  getGroupStudents(groupName: string): Student[] {
+    return this.studentGroups().find(g => g.name === groupName)?.students ?? [];
+  }
+
+  /**
+   * Parses a string like "1, 2, 3-5, 7" into a Set of 1-based serial numbers.
+   * Supports ranges (1-5) and comma/space/newline separators.
+   */
+  private parseSerialNumbers(input: string): Set<number> {
+    const result = new Set<number>();
+    // Split on comma, whitespace, or semicolon
+    const tokens = input.split(/[\s,;]+/).map(t => t.trim()).filter(t => t.length > 0);
+    for (const token of tokens) {
+      const range = token.match(/^(\d+)-(\d+)$/);
+      if (range) {
+        const from = parseInt(range[1], 10);
+        const to = parseInt(range[2], 10);
+        for (let n = from; n <= to; n++) result.add(n);
+      } else {
+        const n = parseInt(token, 10);
+        if (!isNaN(n)) result.add(n);
+      }
+    }
+    return result;
+  }
+
   applyQuickEntry() {
     if (!this.quickEntryText.trim()) return;
 
+    if (this.quickEntryMode === 'serial') {
+      this.applySerialEntry();
+    } else {
+      this.applyRollNumberEntry();
+    }
+  }
+
+  private applySerialEntry() {
+    if (!this.quickEntryGroup) return;
+
+    const groupStudents = this.getGroupStudents(this.quickEntryGroup);
+    if (groupStudents.length === 0) return;
+
+    const presentSerials = this.parseSerialNumbers(this.quickEntryText);
+    const outOfRange: number[] = [];
+    let matched = 0;
+
+    groupStudents.forEach((student, idx) => {
+      const serial = idx + 1; // 1-based
+      if (presentSerials.has(serial)) {
+        this.attendanceMap.set(student.id, 'present');
+        matched++;
+      } else {
+        this.attendanceMap.set(student.id, 'absent');
+      }
+    });
+
+    // Detect serials that are out of range
+    presentSerials.forEach(n => {
+      if (n < 1 || n > groupStudents.length) outOfRange.push(n);
+    });
+
+    this.matchedCount.set(matched);
+    this.unmatchedRolls.set(outOfRange.map(n => `#${n}`));
+    this.quickEntryFeedback.set(
+      `${this.quickEntryGroup}: ${matched} marked Present, ${groupStudents.length - matched} marked Absent`
+      + (outOfRange.length > 0 ? ` · ${outOfRange.length} serial(s) out of range` : '')
+    );
+    this.quickEntryApplied.set(true);
+  }
+
+  private applyRollNumberEntry() {
     const enteredRolls = this.quickEntryText
       .split(/[\n,\s]+/)
       .map(r => r.trim().toUpperCase())
@@ -355,9 +506,7 @@ export class AttendanceComponent implements OnInit {
     if (enteredRolls.length === 0) return;
 
     const studentRollMap = new Map<string, number>();
-    this.students().forEach(s => {
-      studentRollMap.set(s.rollNumber.toUpperCase(), s.id);
-    });
+    this.students().forEach(s => studentRollMap.set(s.rollNumber.toUpperCase(), s.id));
 
     let matched = 0;
     const unmatched: string[] = [];
@@ -377,14 +526,19 @@ export class AttendanceComponent implements OnInit {
 
     this.matchedCount.set(matched);
     this.unmatchedRolls.set(unmatched);
+    this.quickEntryFeedback.set(
+      `${matched} student(s) marked Present, ${this.students().length - matched} marked Absent`
+    );
     this.quickEntryApplied.set(true);
   }
 
   clearQuickEntry() {
     this.quickEntryText = '';
+    this.quickEntryGroup = '';
     this.quickEntryApplied.set(false);
     this.matchedCount.set(0);
     this.unmatchedRolls.set([]);
+    this.quickEntryFeedback.set('');
     this.attendanceMap.clear();
   }
 
@@ -397,16 +551,12 @@ export class AttendanceComponent implements OnInit {
   }
 
   markAllPresent() {
-    this.students().forEach(student => {
-      this.attendanceMap.set(student.id, 'present');
-    });
+    this.students().forEach(s => this.attendanceMap.set(s.id, 'present'));
     this.quickEntryApplied.set(false);
   }
 
   markAllAbsent() {
-    this.students().forEach(student => {
-      this.attendanceMap.set(student.id, 'absent');
-    });
+    this.students().forEach(s => this.attendanceMap.set(s.id, 'absent'));
     this.quickEntryApplied.set(false);
   }
 
@@ -433,8 +583,8 @@ export class AttendanceComponent implements OnInit {
         this.quickEntryText = '';
         this.saving.set(false);
       },
-      error: (error) => {
-        console.error('Failed to save attendance:', error);
+      error: (err) => {
+        console.error('Failed to save attendance:', err);
         alert('Failed to save attendance');
         this.saving.set(false);
       }
