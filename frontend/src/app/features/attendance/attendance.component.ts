@@ -469,33 +469,52 @@ export class AttendanceComponent implements OnInit {
     const groupStudents = this.getGroupStudents(this.quickEntryGroup);
     if (groupStudents.length === 0) return;
 
-    const presentSerials = this.parseSerialNumbers(this.quickEntryText);
-    const outOfRange: number[] = [];
+    const presentSuffixes = this.parseSerialNumbers(this.quickEntryText);
+    const notFound: number[] = [];
     let matched = 0;
 
-    groupStudents.forEach((student, idx) => {
-      const serial = idx + 1; // 1-based
-      if (presentSerials.has(serial)) {
+    // Build a map: numeric suffix → student, for quick lookup within this group
+    // e.g. "22572001" → suffix 1, "22572030" → suffix 30
+    const suffixMap = new Map<number, Student>();
+    groupStudents.forEach(student => {
+      const suffix = this.getRollSuffix(student.rollNumber);
+      if (suffix !== null) suffixMap.set(suffix, student);
+    });
+
+    // First mark all students in this group as absent
+    groupStudents.forEach(student => {
+      this.attendanceMap.set(student.id, 'absent');
+    });
+
+    // Then mark matched ones as present
+    presentSuffixes.forEach(n => {
+      const student = suffixMap.get(n);
+      if (student) {
         this.attendanceMap.set(student.id, 'present');
         matched++;
       } else {
-        this.attendanceMap.set(student.id, 'absent');
+        notFound.push(n);
       }
     });
 
-    // Detect serials that are out of range
-    presentSerials.forEach(n => {
-      if (n < 1 || n > groupStudents.length) outOfRange.push(n);
-    });
-
     this.matchedCount.set(matched);
-    this.unmatchedRolls.set(outOfRange.map(n => `#${n}`));
+    this.unmatchedRolls.set(notFound.map(n => String(n)));
     this.quickEntryFeedback.set(
       `${this.quickEntryGroup}: ${matched} marked Present, ${groupStudents.length - matched} marked Absent`
-      + (outOfRange.length > 0 ? ` · ${outOfRange.length} serial(s) out of range` : '')
     );
     this.quickEntryApplied.set(true);
   }
+
+  /**
+   * Extracts the trailing integer from a roll number.
+   * e.g. "22572001" → 1,  "22572030" → 30,  "CA1-015" → 15
+   */
+  private getRollSuffix(rollNumber: string): number | null {
+    const match = rollNumber.match(/(\d+)$/);
+    if (!match) return null;
+    return parseInt(match[1], 10);
+  }
+
 
   private applyRollNumberEntry() {
     const enteredRolls = this.quickEntryText
