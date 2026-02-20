@@ -473,13 +473,8 @@ export class AttendanceComponent implements OnInit {
     const notFound: number[] = [];
     let matched = 0;
 
-    // Build a map: numeric suffix → student, for quick lookup within this group
-    // e.g. "22572001" → suffix 1, "22572030" → suffix 30
-    const suffixMap = new Map<number, Student>();
-    groupStudents.forEach(student => {
-      const suffix = this.getRollSuffix(student.rollNumber);
-      if (suffix !== null) suffixMap.set(suffix, student);
-    });
+    // Build suffix map using common-prefix stripping across this group's roll numbers
+    const suffixMap = this.getGroupSuffixMap(groupStudents);
 
     // First mark all students in this group as absent
     groupStudents.forEach(student => {
@@ -506,13 +501,37 @@ export class AttendanceComponent implements OnInit {
   }
 
   /**
-   * Extracts the trailing integer from a roll number.
-   * e.g. "22572001" → 1,  "22572030" → 30,  "CA1-015" → 15
+   * Builds a map of { numericSuffix → Student } for a group by stripping
+   * the longest common prefix from all roll numbers in the group.
+   *
+   * Example: rolls ["22572001","22572002","22572030"]
+   *   common prefix = "225720"
+   *   suffixes      = "01" → 1, "02" → 2, "30" → 30
+   *
+   * Teacher types "1" → matches 22572001  ✓
    */
-  private getRollSuffix(rollNumber: string): number | null {
-    const match = rollNumber.match(/(\d+)$/);
-    if (!match) return null;
-    return parseInt(match[1], 10);
+  private getGroupSuffixMap(groupStudents: Student[]): Map<number, Student> {
+    if (groupStudents.length === 0) return new Map();
+
+    const rolls = groupStudents.map(s => s.rollNumber);
+
+    // Find longest common prefix
+    let prefix = rolls[0];
+    for (const roll of rolls) {
+      while (!roll.startsWith(prefix)) {
+        prefix = prefix.slice(0, -1);
+      }
+      if (prefix.length === 0) break;
+    }
+
+    const map = new Map<number, Student>();
+    groupStudents.forEach(student => {
+      const suffix = student.rollNumber.slice(prefix.length);
+      const n = parseInt(suffix, 10);
+      if (!isNaN(n)) map.set(n, student);
+    });
+
+    return map;
   }
 
 
