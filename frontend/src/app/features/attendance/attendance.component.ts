@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -46,16 +46,16 @@ interface StudentGroup {
             <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
             <input
               type="date"
-              [(ngModel)]="selectedDate"
-              (change)="loadStudents()"
+              [ngModel]="selectedDate"
+              (ngModelChange)="onDateChange($event)"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Class</label>
             <select
-              [(ngModel)]="selectedClassId"
-              (change)="loadStudents()"
+              [ngModel]="selectedClassId"
+              (ngModelChange)="onClassChange($event)"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select a class</option>
@@ -302,12 +302,24 @@ interface StudentGroup {
             </div>
           }
 
-          <!-- Save Button -->
-          <div class="mt-6 flex justify-end">
+          <!-- Save Button (Sticky Bottom) -->
+          <div class="fixed bottom-0 left-0 md:left-64 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-40 flex justify-between items-center px-6">
+            <div class="text-sm font-medium">
+              @if (attendanceMap.size > 0) {
+                <span class="text-amber-600 flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                  </svg>
+                  Unsaved changes ({{ attendanceMap.size }})
+                </span>
+              } @else {
+                <span class="text-gray-500">All changes saved or unchanged</span>
+              }
+            </div>
             <button
               (click)="saveAttendance()"
-              [disabled]="saving()"
-              class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              [disabled]="saving() || attendanceMap.size === 0"
+              class="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               @if (saving()) {
                 <span class="flex items-center gap-2">
@@ -320,6 +332,9 @@ interface StudentGroup {
             </button>
           </div>
         </div>
+        
+        <!-- Add padding at the bottom to prevent the sticky footer from hiding the last row -->
+        <div class="h-20"></div>
       } @else {
         <div class="bg-white rounded-lg shadow-sm p-12 text-center">
           <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -378,6 +393,13 @@ export class AttendanceComponent implements OnInit {
 
   constructor(private http: HttpClient) { }
 
+  @HostListener('window:beforeunload', ['$event'])
+  unloadNotification($event: any) {
+    if (this.attendanceMap.size > 0) {
+      $event.returnValue = true;
+    }
+  }
+
   ngOnInit() {
     this.loadClasses();
   }
@@ -396,6 +418,30 @@ export class AttendanceComponent implements OnInit {
         alert('Failed to load classes');
       }
     });
+  }
+
+  onDateChange(newDate: string) {
+    if (this.attendanceMap.size > 0) {
+      if (!confirm('You have unsaved attendance marks. Are you sure you want to change the date? Unsaved changes will be lost.')) {
+        // Reset the model back to the old value
+        setTimeout(() => this.selectedDate = this.selectedDate, 0);
+        return;
+      }
+    }
+    this.selectedDate = newDate;
+    this.loadStudents();
+  }
+
+  onClassChange(newClassId: string) {
+    if (this.attendanceMap.size > 0) {
+      if (!confirm('You have unsaved attendance marks. Are you sure you want to change the class? Unsaved changes will be lost.')) {
+        // Reset the model back to the old value
+        setTimeout(() => this.selectedClassId = this.selectedClassId, 0);
+        return;
+      }
+    }
+    this.selectedClassId = newClassId;
+    this.loadStudents();
   }
 
   loadStudents() {

@@ -3,6 +3,8 @@ import { authGuard } from './core/guards/auth.guard';
 import { LoginComponent } from './features/auth/login.component';
 import { RegisterComponent } from './features/auth/register.component';
 
+import { unsavedChangesGuard } from './core/guards/unsaved-changes.guard';
+
 export const routes: Routes = [
     { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
     { path: 'login', component: LoginComponent },
@@ -25,6 +27,7 @@ export const routes: Routes = [
     {
         path: 'attendance',
         canActivate: [authGuard],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () => import('./features/attendance/attendance.component').then(m => m.AttendanceComponent)
     },
     {
