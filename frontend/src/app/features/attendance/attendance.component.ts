@@ -103,7 +103,7 @@ interface StudentGroup {
               [class.text-blue-700]="quickEntryMode !== 'serial'"
               class="px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-300 transition"
             >
-              By Serial No. (Group)
+              By Roll No. Suffix (Group)
             </button>
           </div>
 
@@ -141,15 +141,15 @@ interface StudentGroup {
               @if (quickEntryGroup) {
                 <!-- Preview of students in selected group -->
                 <div class="bg-white border border-blue-200 rounded-lg px-4 py-2 text-xs text-gray-600 max-h-28 overflow-y-auto">
-                  @for (s of getGroupStudents(quickEntryGroup); track s.id; let i = $index) {
-                    <span class="inline-block mr-3"><span class="font-semibold text-blue-700">{{ i + 1 }}.</span> {{ s.name }}</span>
+                  @for (s of getGroupStudents(quickEntryGroup); track s.id) {
+                    <span class="inline-block mr-3"><span class="font-semibold text-blue-700">{{ s.rollNumber }}</span> - {{ s.name }}</span>
                   }
                 </div>
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Enter serial numbers of <strong class="text-green-700">present</strong> students
-                    <span class="text-gray-400 font-normal">(1, 2, 3 … or ranges like 1-5)</span>
+                    Enter last digits (suffix) of <strong class="text-green-700">present</strong> students
+                    <span class="text-gray-400 font-normal">(e.g. 1, 2, 3 … or ranges like 15-20)</span>
                   </label>
                   <textarea
                     [(ngModel)]="quickEntryText"
@@ -259,10 +259,6 @@ interface StudentGroup {
                      [class.border-yellow-300]="getStatus(student.id) === 'late'"
                      [class.bg-yellow-50]="getStatus(student.id) === 'late'">
                   <div class="flex items-center gap-3 flex-1">
-                    <!-- Serial number badge -->
-                    <span class="w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                      {{ i + 1 }}
-                    </span>
                     <div>
                       <h3 class="font-medium text-gray-900">{{ student.name }}</h3>
                       <p class="text-sm text-gray-500">Roll No: {{ student.rollNumber }}</p>
