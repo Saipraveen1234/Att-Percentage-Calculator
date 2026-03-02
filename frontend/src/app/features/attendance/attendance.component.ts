@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed, HostListener } from '@angular/core
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 interface Student {
@@ -245,8 +246,30 @@ interface StudentGroup {
                   </svg>
                   {{ group.name }} ({{ group.students.length }})
                 </span>
+                
+                @if (isGroupAttendanceTaken(group.name)) {
+                  <span class="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold flex items-center gap-1 border border-green-200 shadow-sm">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Attendance Taken
+                  </span>
+                }
+                
                 <div class="flex-1 h-px bg-gray-200"></div>
               </div>
+            } @else {
+              <!-- For non-combined classes, show if attendance is already taken for the whole class -->
+              @if (isGroupAttendanceTaken(group.name)) {
+                <div class="mb-4">
+                  <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold flex items-center gap-2 border border-green-200 shadow-sm inline-flex">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Attendance already recorded for this date
+                  </span>
+                </div>
+              }
             }
 
             <div class="space-y-3 mb-2">
@@ -305,12 +328,12 @@ interface StudentGroup {
           <!-- Save Button (Sticky Bottom) -->
           <div class="fixed bottom-0 left-0 md:left-64 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-40 flex justify-between items-center px-6">
             <div class="text-sm font-medium">
-              @if (attendanceMap.size > 0) {
+              @if (unsavedChangesCount() > 0) {
                 <span class="text-amber-600 flex items-center gap-2">
                   <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                   </svg>
-                  Unsaved changes ({{ attendanceMap.size }})
+                  Unsaved changes ({{ unsavedChangesCount() }})
                 </span>
               } @else {
                 <span class="text-gray-500">All changes saved or unchanged</span>
@@ -318,7 +341,7 @@ interface StudentGroup {
             </div>
             <button
               (click)="saveAttendance()"
-              [disabled]="saving() || attendanceMap.size === 0"
+              [disabled]="saving() || unsavedChangesCount() === 0"
               class="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               @if (saving()) {
@@ -391,11 +414,44 @@ export class AttendanceComponent implements OnInit {
     }));
   });
 
+  originalAttendanceMap = new Map<number, 'present' | 'absent' | 'late'>();
+  unsavedChangesCountSignal = signal(0);
+
+  getUnsavedChangesCount(): number {
+    let diff = 0;
+    const allKeys = new Set([...Array.from(this.attendanceMap.keys()), ...Array.from(this.originalAttendanceMap.keys())]);
+
+    for (const key of allKeys) {
+      const current = this.attendanceMap.get(key);
+      const original = this.originalAttendanceMap.get(key);
+      if (current !== original) diff++;
+    }
+    return diff;
+  }
+
+  updateUnsavedChangesSignal() {
+    this.unsavedChangesCountSignal.set(this.getUnsavedChangesCount());
+  }
+
+  unsavedChangesCount() {
+    return this.unsavedChangesCountSignal();
+  }
+
+  isGroupAttendanceTaken(groupName: string): boolean {
+    const group = this.getGroupStudents(groupName);
+    if (group.length === 0) return false;
+    return group.some(student => this.originalAttendanceMap.has(student.id));
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.getUnsavedChangesCount() > 0;
+  }
+
   constructor(private http: HttpClient) { }
 
   @HostListener('window:beforeunload', ['$event'])
   unloadNotification($event: any) {
-    if (this.attendanceMap.size > 0) {
+    if (this.hasUnsavedChanges()) {
       $event.returnValue = true;
     }
   }
@@ -421,7 +477,7 @@ export class AttendanceComponent implements OnInit {
   }
 
   onDateChange(newDate: string) {
-    if (this.attendanceMap.size > 0) {
+    if (this.hasUnsavedChanges()) {
       if (!confirm('You have unsaved attendance marks. Are you sure you want to change the date? Unsaved changes will be lost.')) {
         // Reset the model back to the old value
         setTimeout(() => this.selectedDate = this.selectedDate, 0);
@@ -433,7 +489,7 @@ export class AttendanceComponent implements OnInit {
   }
 
   onClassChange(newClassId: string) {
-    if (this.attendanceMap.size > 0) {
+    if (this.hasUnsavedChanges()) {
       if (!confirm('You have unsaved attendance marks. Are you sure you want to change the class? Unsaved changes will be lost.')) {
         // Reset the model back to the old value
         setTimeout(() => this.selectedClassId = this.selectedClassId, 0);
@@ -447,25 +503,41 @@ export class AttendanceComponent implements OnInit {
   loadStudents() {
     if (!this.selectedClassId) {
       this.students.set([]);
+      this.attendanceMap.clear();
+      this.originalAttendanceMap.clear();
+      this.updateUnsavedChangesSignal();
       return;
     }
     this.loading.set(true);
     this.quickEntryApplied.set(false);
     this.quickEntryText = '';
     this.quickEntryGroup = '';
-    this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}`)
-      .subscribe({
-        next: (response) => {
-          this.students.set(response.students);
-          this.attendanceMap.clear();
-          this.loading.set(false);
-        },
-        error: (err) => {
-          console.error('Failed to load students:', err);
-          alert('Failed to load students');
-          this.loading.set(false);
-        }
-      });
+
+    forkJoin({
+      studentsRes: this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}`),
+      attendanceRes: this.http.get<any[]>(`${environment.apiUrl}/attendance/date/${this.selectedDate}?classId=${this.selectedClassId}`)
+    }).subscribe({
+      next: ({ studentsRes, attendanceRes }) => {
+        this.students.set(studentsRes.students);
+
+        // Populate the attendance maps with existing data
+        this.attendanceMap.clear();
+        this.originalAttendanceMap.clear();
+
+        attendanceRes.forEach(record => {
+          this.attendanceMap.set(record.studentId, record.status);
+          this.originalAttendanceMap.set(record.studentId, record.status);
+        });
+
+        this.updateUnsavedChangesSignal();
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load data:', err);
+        alert('Failed to load students and attendance');
+        this.loading.set(false);
+      }
+    });
   }
 
   /** Returns the ordered list of students for a given group name */
@@ -540,6 +612,7 @@ export class AttendanceComponent implements OnInit {
       `${this.quickEntryGroup}: ${matched} marked Present, ${groupStudents.length - matched} marked Absent`
     );
     this.quickEntryApplied.set(true);
+    this.updateUnsavedChangesSignal();
   }
 
   /**
@@ -610,6 +683,7 @@ export class AttendanceComponent implements OnInit {
       `${matched} student(s) marked Present, ${this.students().length - matched} marked Absent`
     );
     this.quickEntryApplied.set(true);
+    this.updateUnsavedChangesSignal();
   }
 
   clearQuickEntry() {
@@ -619,11 +693,13 @@ export class AttendanceComponent implements OnInit {
     this.matchedCount.set(0);
     this.unmatchedRolls.set([]);
     this.quickEntryFeedback.set('');
-    this.attendanceMap.clear();
+    // Notice: We purposefully don't clear attendanceMap here so users don't lose manual touches
+    this.updateUnsavedChangesSignal();
   }
 
   setAttendance(studentId: number, status: 'present' | 'absent' | 'late') {
     this.attendanceMap.set(studentId, status);
+    this.updateUnsavedChangesSignal();
   }
 
   getStatus(studentId: number): 'present' | 'absent' | 'late' | undefined {
@@ -633,11 +709,13 @@ export class AttendanceComponent implements OnInit {
   markAllPresent() {
     this.students().forEach(s => this.attendanceMap.set(s.id, 'present'));
     this.quickEntryApplied.set(false);
+    this.updateUnsavedChangesSignal();
   }
 
   markAllAbsent() {
     this.students().forEach(s => this.attendanceMap.set(s.id, 'absent'));
     this.quickEntryApplied.set(false);
+    this.updateUnsavedChangesSignal();
   }
 
   saveAttendance() {
@@ -658,7 +736,14 @@ export class AttendanceComponent implements OnInit {
     }).subscribe({
       next: () => {
         alert('Attendance saved successfully!');
-        this.attendanceMap.clear();
+
+        // Update original map to reflect new saved state
+        this.originalAttendanceMap.clear();
+        for (const [key, val] of this.attendanceMap.entries()) {
+          this.originalAttendanceMap.set(key, val);
+        }
+        this.updateUnsavedChangesSignal();
+
         this.quickEntryApplied.set(false);
         this.quickEntryText = '';
         this.saving.set(false);
