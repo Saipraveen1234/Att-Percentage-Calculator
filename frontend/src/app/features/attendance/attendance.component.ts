@@ -206,20 +206,19 @@ interface StudentGroup {
           }
         </div>
 
-        <!-- Bulk Actions -->
         <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
           <div class="flex gap-3">
             <button
               (click)="markAllPresent()"
               class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
             >
-              Mark All Present
+              {{ quickEntryMode === 'serial' && quickEntryGroup ? 'Mark Group Present' : 'Mark All Present' }}
             </button>
             <button
               (click)="markAllAbsent()"
               class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
             >
-              Mark All Absent
+              {{ quickEntryMode === 'serial' && quickEntryGroup ? 'Mark Group Absent' : 'Mark All Absent' }}
             </button>
           </div>
         </div>
@@ -707,13 +706,23 @@ export class AttendanceComponent implements OnInit {
   }
 
   markAllPresent() {
-    this.students().forEach(s => this.attendanceMap.set(s.id, 'present'));
+    let affectedStudents = this.students();
+    if (this.quickEntryMode === 'serial' && this.quickEntryGroup) {
+      affectedStudents = this.getGroupStudents(this.quickEntryGroup);
+    }
+
+    affectedStudents.forEach(s => this.attendanceMap.set(s.id, 'present'));
     this.quickEntryApplied.set(false);
     this.updateUnsavedChangesSignal();
   }
 
   markAllAbsent() {
-    this.students().forEach(s => this.attendanceMap.set(s.id, 'absent'));
+    let affectedStudents = this.students();
+    if (this.quickEntryMode === 'serial' && this.quickEntryGroup) {
+      affectedStudents = this.getGroupStudents(this.quickEntryGroup);
+    }
+
+    affectedStudents.forEach(s => this.attendanceMap.set(s.id, 'absent'));
     this.quickEntryApplied.set(false);
     this.updateUnsavedChangesSignal();
   }
