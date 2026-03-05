@@ -22,7 +22,7 @@ body {
     }
 
     .btn-primary {
-        @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+        @apply bg-[#10B981] text-white hover:bg-[#059669] focus:ring-[#10B981] shadow-sm transform transition hover:-translate-y-0.5;
     }
 
     .btn-secondary {
@@ -34,11 +34,11 @@ body {
     }
 
     .input {
-        @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+        @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent transition;
     }
 
     .spinner {
-        @apply inline-block w-6 h-6 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin;
+        @apply inline-block w-6 h-6 border-4 border-gray-200 border-t-[#10B981] rounded-full animate-spin;
     }
 }
 
