@@ -42,17 +42,7 @@ interface StudentGroup {
 
       <!-- Date and Class Selection -->
       <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
-            <input
-              type="date"
-              [max]="todayDate"
-              [ngModel]="selectedDate"
-              (ngModelChange)="onDateChange($event)"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Class</label>
             <select
@@ -65,6 +55,82 @@ interface StudentGroup {
                 <option [value]="class.id">{{ class.name }}</option>
               }
             </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Group</label>
+            <select
+              [ngModel]="selectedGroup()"
+              (ngModelChange)="onGroupChange($event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
+              [disabled]="allGroups().length === 0"
+            >
+              <option value="">All Groups</option>
+              @for (g of allGroups(); track g) {
+                <option [value]="g">{{ g }}</option>
+              }
+            </select>
+          </div>
+          <div class="relative calendar-container">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+            <button
+              type="button"
+              (click)="toggleCalendar()"
+              class="w-full px-4 py-2 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white flex items-center justify-between"
+            >
+              <span>{{ selectedDate | date:'mediumDate' }}</span>
+              <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </button>
+            @if (isCalendarOpen) {
+              <div class="absolute top-full right-0 md:left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-4 w-72">
+                <div class="flex items-center justify-between mb-4">
+                  <button type="button" (click)="prevMonth()" class="p-1 hover:bg-gray-100 rounded-full transition text-gray-600">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                  <span class="font-semibold text-gray-800">{{ currentMonthName }} {{ currentYear }}</span>
+                  <button type="button" (click)="nextMonth()" class="p-1 hover:bg-gray-100 rounded-full transition text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed" [disabled]="isCurrentMonthOrFuture()">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+                
+                <div class="grid grid-cols-7 gap-1 text-center mb-2">
+                  @for (day of weekDays; track day) {
+                    <div class="text-xs font-medium text-gray-400">{{ day }}</div>
+                  }
+                </div>
+
+                <div class="grid grid-cols-7 gap-1">
+                  @for (d of calendarDays; track d.uuid) {
+                    <button
+                      type="button"
+                      (click)="selectCalendarDate(d)"
+                      [disabled]="d.isDisabled || d.isFuture"
+                      class="h-9 w-full rounded-md flex items-center justify-center text-sm transition relative"
+                      [class.opacity-0]="d.dayOfMonth === 0"
+                      [class.pointer-events-none]="d.dayOfMonth === 0"
+                      [class.text-gray-300]="d.isFuture && d.dayOfMonth !== 0"
+                      [class.cursor-not-allowed]="d.isFuture"
+                      [class.bg-blue-600]="isSelectedDate(d)"
+                      [class.text-white]="isSelectedDate(d)"
+                      [class.hover:bg-gray-100]="!isSelectedDate(d) && !d.isDisabled && !d.isFuture"
+                    >
+                      @if (d.dayOfMonth !== 0) {
+                        <span>{{ d.dayOfMonth }}</span>
+                        @if (!d.isFuture && d.attendanceColor) {
+                          <div class="absolute bottom-1 w-1.5 h-1.5 rounded-full"
+                            [class.bg-green-500]="d.attendanceColor === 'green' && !isSelectedDate(d)"
+                            [class.bg-green-200]="d.attendanceColor === 'green' && isSelectedDate(d)"
+                            [class.bg-red-500]="d.attendanceColor === 'red' && !isSelectedDate(d)"
+                            [class.bg-red-200]="d.attendanceColor === 'red' && isSelectedDate(d)">
+                          </div>
+                        }
+                      }
+                    </button>
+                  }
+                </div>
+              </div>
+            }
           </div>
         </div>
       </div>
@@ -394,13 +460,36 @@ export class AttendanceComponent implements OnInit {
     this.students().some(s => s.group && s.group.trim() !== '')
   );
 
+  selectedGroup = signal<string>('');
+
+  // Calendar State
+  isCalendarOpen = false;
+  currentCalendarDate = new Date();
+  weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  calendarDays: { uuid: string, date: Date, dayOfMonth: number, isDisabled: boolean, isFuture: boolean, dateStr: string, attendanceColor?: 'green' | 'red' }[] = [];
+  monthlyRecords: any[] = [];
+  monthlyAttendanceStats: Map<string, boolean> = new Map();
+
+  allGroups = computed<string[]>(() => {
+    const groups = new Set<string>();
+    this.students().forEach(s => {
+      const g = s.group?.trim();
+      if (g) groups.add(g);
+    });
+    return Array.from(groups).sort();
+  });
+
   // Computed: students grouped by their group field
   studentGroups = computed<StudentGroup[]>(() => {
     const groupMap = new Map<string, Student[]>();
+    const selGroup = this.selectedGroup();
+
     this.students().forEach(student => {
       const key = student.group?.trim() || '';
-      if (!groupMap.has(key)) groupMap.set(key, []);
-      groupMap.get(key)!.push(student);
+      if (!selGroup || key === selGroup) {
+        if (!groupMap.has(key)) groupMap.set(key, []);
+        groupMap.get(key)!.push(student);
+      }
     });
 
     const sorted = Array.from(groupMap.entries()).sort(([a], [b]) => {
@@ -457,6 +546,14 @@ export class AttendanceComponent implements OnInit {
     }
   }
 
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (this.isCalendarOpen && !target.closest('.calendar-container')) {
+      this.isCalendarOpen = false;
+    }
+  }
+
   ngOnInit() {
     this.loadClasses();
   }
@@ -489,15 +586,27 @@ export class AttendanceComponent implements OnInit {
     this.loadStudents();
   }
 
+  onGroupChange(newGroup: string) {
+    if (this.hasUnsavedChanges()) {
+      if (!confirm('You have unsaved changes. Change group anyway and lose changes?')) {
+        return;
+      }
+    }
+    this.selectedGroup.set(newGroup);
+    if (this.isCalendarOpen) {
+      this.buildMonthlyStatsAndCalendar();
+    }
+  }
+
   onClassChange(newClassId: string) {
     if (this.hasUnsavedChanges()) {
       if (!confirm('You have unsaved attendance marks. Are you sure you want to change the class? Unsaved changes will be lost.')) {
-        // Reset the model back to the old value
         setTimeout(() => this.selectedClassId = this.selectedClassId, 0);
         return;
       }
     }
     this.selectedClassId = newClassId;
+    this.selectedGroup.set('');
     this.loadStudents();
   }
 
@@ -532,6 +641,11 @@ export class AttendanceComponent implements OnInit {
 
         this.updateUnsavedChangesSignal();
         this.loading.set(false);
+
+        // Refresh the calendar layout now that students are loaded
+        if (this.isCalendarOpen) {
+          this.fetchMonthlyAttendance();
+        }
       },
       error: (err) => {
         console.error('Failed to load data:', err);
@@ -539,6 +653,139 @@ export class AttendanceComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  // == Calendar Logic == //
+  toggleCalendar() {
+    this.isCalendarOpen = !this.isCalendarOpen;
+    if (this.isCalendarOpen) {
+      this.currentCalendarDate = new Date(this.selectedDate);
+      this.fetchMonthlyAttendance();
+    }
+  }
+
+  get currentMonthName() {
+    return this.currentCalendarDate.toLocaleString('default', { month: 'long' });
+  }
+
+  get currentYear() {
+    return this.currentCalendarDate.getFullYear();
+  }
+
+  prevMonth() {
+    this.currentCalendarDate = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() - 1, 1);
+    this.fetchMonthlyAttendance();
+  }
+
+  nextMonth() {
+    this.currentCalendarDate = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() + 1, 1);
+    this.fetchMonthlyAttendance();
+  }
+
+  isCurrentMonthOrFuture() {
+    const today = new Date();
+    return this.currentCalendarDate.getMonth() >= today.getMonth() && this.currentCalendarDate.getFullYear() >= today.getFullYear();
+  }
+
+  isSelectedDate(d: any) {
+    if (d.dayOfMonth === 0) return false;
+    return d.dateStr === this.selectedDate;
+  }
+
+  selectCalendarDate(d: any) {
+    if (d.isDisabled || d.isFuture || d.dayOfMonth === 0) return;
+    this.isCalendarOpen = false;
+    if (this.selectedDate !== d.dateStr) {
+      this.onDateChange(d.dateStr);
+    }
+  }
+
+  fetchMonthlyAttendance() {
+    if (!this.selectedClassId) return;
+
+    const start = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth(), 1);
+    const end = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() + 1, 0);
+
+    const startDateStr = start.toISOString().split('T')[0];
+    const endDateStr = end.toISOString().split('T')[0];
+
+    this.http.get<any[]>(`${environment.apiUrl}/attendance/class/${this.selectedClassId}/range?startDate=${startDateStr}&endDate=${endDateStr}`)
+      .subscribe({
+        next: (records) => {
+          this.monthlyRecords = records;
+          this.buildMonthlyStatsAndCalendar();
+        }
+      });
+  }
+
+  buildMonthlyStatsAndCalendar() {
+    this.monthlyAttendanceStats.clear();
+
+    const recordsByDate = new Map<string, any[]>();
+    this.monthlyRecords.forEach(r => {
+      const dStr = r.date.split('T')[0];
+      if (!recordsByDate.has(dStr)) recordsByDate.set(dStr, []);
+      recordsByDate.get(dStr)!.push(r);
+    });
+
+    const groupTarget = this.selectedGroup() || '';
+
+    recordsByDate.forEach((dayRecords, dateStr) => {
+      let hasAttendanceForGroup = false;
+      if (!groupTarget) {
+        hasAttendanceForGroup = dayRecords.length > 0;
+      } else {
+        hasAttendanceForGroup = dayRecords.some(req => {
+          const stu = this.students().find(s => s.id === req.student.id);
+          return stu && (stu.group?.trim() || '') === groupTarget;
+        });
+      }
+      this.monthlyAttendanceStats.set(dateStr, hasAttendanceForGroup);
+    });
+
+    this.buildCalendarGrid();
+  }
+
+  buildCalendarGrid() {
+    this.calendarDays = [];
+    const year = this.currentCalendarDate.getFullYear();
+    const month = this.currentCalendarDate.getMonth();
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Empty paddings
+    for (let i = 0; i < firstDayIndex; i++) {
+      this.calendarDays.push({ uuid: `empty-pre-${i}`, date: new Date(year, month, i - firstDayIndex + 1), dayOfMonth: 0, isDisabled: true, isFuture: false, dateStr: '' });
+    }
+
+    for (let i = 1; i <= lastDate; i++) {
+      const d = new Date(year, month, i);
+      // Correct timezone offset stripping to ensure local date string is accurate without timezone shift issues
+      const localD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+      const dateStr = localD.toISOString().split('T')[0];
+
+      const isFuture = d > today;
+      let color: 'green' | 'red' | undefined = undefined;
+
+      if (!isFuture && d.getDay() !== 0) { // Sunday = 0
+        const hasAtt = this.monthlyAttendanceStats.get(dateStr);
+        color = hasAtt ? 'green' : 'red';
+      }
+
+      this.calendarDays.push({
+        uuid: dateStr,
+        date: d,
+        dayOfMonth: i,
+        isDisabled: false,
+        isFuture: isFuture,
+        dateStr: dateStr,
+        attendanceColor: color
+      });
+    }
   }
 
   /** Returns the ordered list of students for a given group name */
@@ -754,6 +1001,11 @@ export class AttendanceComponent implements OnInit {
           this.originalAttendanceMap.set(key, val);
         }
         this.updateUnsavedChangesSignal();
+
+        // Refresh the calendar if it happens to be open
+        if (this.isCalendarOpen) {
+          this.fetchMonthlyAttendance();
+        }
 
         this.quickEntryApplied.set(false);
         this.quickEntryText = '';
