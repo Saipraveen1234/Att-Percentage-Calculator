@@ -708,11 +708,17 @@ export class AttendanceComponent implements OnInit {
     this.monthlyAttendanceStats.clear();
     this.buildCalendarGrid();
 
-    const start = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth(), 1);
-    const end = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() + 1, 0);
+    const year = this.currentCalendarDate.getFullYear();
+    const month = this.currentCalendarDate.getMonth();
 
-    const startDateStr = start.toISOString().split('T')[0];
-    const endDateStr = end.toISOString().split('T')[0];
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+
+    const localStart = new Date(start.getTime() - (start.getTimezoneOffset() * 60000));
+    const localEnd = new Date(end.getTime() - (end.getTimezoneOffset() * 60000));
+
+    const startDateStr = localStart.toISOString().split('T')[0];
+    const endDateStr = localEnd.toISOString().split('T')[0];
 
     this.http.get<any[]>(`${environment.apiUrl}/attendance/class/${this.selectedClassId}/range?startDate=${startDateStr}&endDate=${endDateStr}`)
       .subscribe({
