@@ -703,6 +703,11 @@ export class AttendanceComponent implements OnInit {
   fetchMonthlyAttendance() {
     if (!this.selectedClassId) return;
 
+    // Build the bare calendar grid immediately so the UI is snappy,
+    // wait for the network to add the green/red color-coding
+    this.monthlyAttendanceStats.clear();
+    this.buildCalendarGrid();
+
     const start = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth(), 1);
     const end = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() + 1, 0);
 
