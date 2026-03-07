@@ -24,10 +24,12 @@ export type ChartOptions = {
   plotOptions: ApexPlotOptions;
 };
 
+import { RouterModule } from '@angular/router';
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, NgApexchartsModule],
+  imports: [CommonModule, NgApexchartsModule, RouterModule],
   template: `
     <div class="space-y-6">
       
@@ -48,23 +50,13 @@ export type ChartOptions = {
         </div>
         
         <div class="flex items-center gap-3">
-          <select class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#10B981] focus:border-[#10B981] block px-4 py-2.5 outline-none transition">
-            <option>All Classes</option>
+          <select #classSelect class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#10B981] focus:border-[#10B981] block px-4 py-2.5 outline-none transition">
+            <option value="all">All Classes</option>
             @for (c of classes(); track c.id) {
               <option value="{{c.id}}">{{c.name}}</option>
             }
           </select>
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </div>
-            <select class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#10B981] focus:border-[#10B981] block pl-9 pr-6 py-2.5 outline-none transition appearance-none">
-              <option>Last 30 days</option>
-              <option>Last 7 days</option>
-              <option>This Semester</option>
-            </select>
-          </div>
-          <button class="bg-[#10B981] hover:bg-[#0EA5E9] transition-colors text-white px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-sm">
+          <button (click)="applyFilter(classSelect.value)" class="bg-[#10B981] hover:bg-[#059669] transition-colors text-white px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-sm">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
             Filter
           </button>
@@ -84,7 +76,6 @@ export type ChartOptions = {
               <h3 class="text-2xl font-bold text-gray-900 leading-none">{{ stats().totalStudents }}</h3>
             </div>
           </div>
-          <button class="text-gray-300 hover:text-gray-500"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg></button>
         </div>
 
         <!-- Card 2 (Highlight Green) -->
@@ -98,7 +89,6 @@ export type ChartOptions = {
               <h3 class="text-2xl font-bold leading-none">{{ stats().todayPresent }}</h3>
             </div>
           </div>
-          <button class="text-emerald-200 hover:text-white"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg></button>
         </div>
 
         <!-- Card 3 -->
@@ -112,7 +102,7 @@ export type ChartOptions = {
               <h3 class="text-2xl font-bold text-gray-900 leading-none">{{ stats().todayAbsent }}</h3>
             </div>
           </div>
-          <button class="bg-gray-800 text-xs text-white px-2.5 py-1 rounded shadow-sm hover:bg-black transition">View Details</button>
+          <button routerLink="/attendance" class="bg-gray-800 text-xs text-white px-2.5 py-1 rounded shadow-sm hover:bg-black transition">View Details</button>
         </div>
 
         <!-- Card 4 -->
@@ -126,7 +116,6 @@ export type ChartOptions = {
               <h3 class="text-2xl font-bold text-gray-900 leading-none">{{ stats().todayLate }}</h3>
             </div>
           </div>
-          <button class="text-gray-300 hover:text-gray-500"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg></button>
         </div>
       </div>
 
@@ -137,7 +126,7 @@ export type ChartOptions = {
         <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-900">Total Attendance Report</h2>
-            <button class="text-gray-300 hover:text-gray-500"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg></button>
+            <button class="text-[#10B981] hover:text-[#059669] text-sm font-medium transition" routerLink="/reports">Full Report &rarr;</button>
           </div>
           @if (lineChartOptions) {
             <div id="chart">
@@ -162,7 +151,6 @@ export type ChartOptions = {
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-900">Students by Class</h2>
-            <button class="text-gray-300 hover:text-gray-500"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg></button>
           </div>
           @if (barChartOptions) {
             <div id="bar-chart">
@@ -187,7 +175,6 @@ export type ChartOptions = {
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 lg:col-span-1">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-900">Weekly Absent</h2>
-            <button class="text-gray-300 hover:text-gray-500"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg></button>
           </div>
           @if (radarChartOptions) {
             <div id="radar-chart" class="flex justify-center">
@@ -236,6 +223,11 @@ export class DashboardComponent implements OnInit {
     this.loadData();
   }
 
+  applyFilter(classIdValue: string): void {
+    const classIdFilter = classIdValue === 'all' ? undefined : Number(classIdValue);
+    this.loadStatsData(classIdFilter);
+  }
+
   private loadData(): void {
     this.classService.getAll().subscribe({
       next: (classes) => {
@@ -244,17 +236,24 @@ export class DashboardComponent implements OnInit {
       }
     });
 
-    this.studentService.getAll().subscribe({
+    this.loadStatsData();
+  }
+
+  private loadStatsData(classId?: number): void {
+    const params = classId ? { classId } : {};
+
+    this.studentService.getAll(params).subscribe({
       next: (response) => {
         this.stats.update(s => ({ ...s, totalStudents: response.pagination.total }));
-        // Initialize mock line chart data to match UI since we don't have historical aggregation endpoint out-of-box
-        this.initLineChart(response.pagination.total);
-        this.initRadarChart();
+        if (!classId) {
+          this.initLineChart(response.pagination.total);
+          this.initRadarChart();
+        }
       }
     });
 
     const today = new Date().toISOString().split('T')[0];
-    this.attendanceService.getByDate(today).subscribe({
+    this.attendanceService.getByDate(today, classId).subscribe({
       next: (attendance) => {
         let present = 0; let absent = 0; let late = 0;
         attendance.forEach(a => {
