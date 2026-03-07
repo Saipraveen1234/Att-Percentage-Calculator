@@ -624,8 +624,8 @@ export class AttendanceComponent implements OnInit {
     this.quickEntryGroup = '';
 
     forkJoin({
-      studentsRes: this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}`),
-      attendanceRes: this.http.get<any[]>(`${environment.apiUrl}/attendance/date/${this.selectedDate}?classId=${this.selectedClassId}`)
+      studentsRes: this.http.get<{ students: Student[] }>(`${environment.apiUrl}/students?classId=${this.selectedClassId}&_cb=${Date.now()}`),
+      attendanceRes: this.http.get<any[]>(`${environment.apiUrl}/attendance/date/${this.selectedDate}?classId=${this.selectedClassId}&_cb=${Date.now()}`)
     }).subscribe({
       next: ({ studentsRes, attendanceRes }) => {
         this.students.set(studentsRes.students);
@@ -720,7 +720,7 @@ export class AttendanceComponent implements OnInit {
     const startDateStr = localStart.toISOString().split('T')[0];
     const endDateStr = localEnd.toISOString().split('T')[0];
 
-    this.http.get<any[]>(`${environment.apiUrl}/attendance/class/${this.selectedClassId}/range?startDate=${startDateStr}&endDate=${endDateStr}`)
+    this.http.get<any[]>(`${environment.apiUrl}/attendance/class/${this.selectedClassId}/range?startDate=${startDateStr}&endDate=${endDateStr}&_cb=${Date.now()}`)
       .subscribe({
         next: (records) => {
           this.monthlyRecords = records;
