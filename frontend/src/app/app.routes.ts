@@ -3,12 +3,13 @@ import { authGuard } from './core/guards/auth.guard';
 import { LoginComponent } from './features/auth/login.component';
 import { RegisterComponent } from './features/auth/register.component';
 
+import { guestGuard } from './core/guards/guest.guard';
 import { unsavedChangesGuard } from './core/guards/unsaved-changes.guard';
 
 export const routes: Routes = [
     { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
-    { path: 'login', component: LoginComponent },
-    { path: 'register', component: RegisterComponent },
+    { path: 'login', canActivate: [guestGuard], component: LoginComponent },
+    { path: 'register', canActivate: [guestGuard], component: RegisterComponent },
     {
         path: 'dashboard',
         canActivate: [authGuard],

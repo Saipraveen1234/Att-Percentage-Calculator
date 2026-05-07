@@ -7,7 +7,7 @@ import { AuthService } from './core/services/auth.service';
   selector: 'app-root',
   imports: [CommonModule, RouterOutlet, RouterLink],
   template: `
-    @if (authService.isAuthenticated()) {
+    @if (authService.isAuthenticated() && !isAuthRoute) {
       <div class="min-h-screen bg-[#F8FAFC]">
         <!-- Top Navigation -->
         <header class="bg-[#1B2028] text-white shadow-md sticky top-0 z-50">
@@ -128,6 +128,13 @@ export class App {
   private router = inject(Router);
 
   currentUser$ = this.authService.currentUser$;
+  isAuthRoute = false;
+
+  constructor() {
+    this.router.events.subscribe(() => {
+      this.isAuthRoute = this.router.url.includes('/login') || this.router.url.includes('/register');
+    });
+  }
 
   logout(): void {
     this.authService.logout();
